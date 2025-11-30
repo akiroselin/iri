@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Healing Corgi Space (Final)</title>
+    <style>
+        body { 
+            margin: 0; overflow: hidden; background-color: #87CEEB; 
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif; 
+            user-select: none; -webkit-user-select: none;
+        }
+
+        /* --- 左上角：日程与天气 (高透明磨砂) --- */
+        #sidebar {
+            position: absolute; top: 20px; left: 20px; width: 240px;
+            display: flex; flex-direction: column; gap: 10px; z-index: 10;
+            pointer-events: none; /* 容器穿透 */
+        }
+
+        .glass-panel {
+            /* 极高透明度 */
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px; padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            pointer-events: auto; transition: transform 0.2s, background 0.3s;
+            color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        .glass-panel:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.35); }
+
+        /* 天气栏 */
+        .weather-row { display: flex; justify-content: space-around; font-size: 18px; }
+        .weather-icon { cursor: pointer; opacity: 0.6; transition: 0.3s; }
+        .weather-icon:hover, .weather-icon.active { opacity: 1; transform: scale(1.2); text-shadow: 0 0 10px yellow; }
+
+        /* 日程列表 */
+        .panel-header { font-size: 13px; font-weight: 800; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px; display: flex; justify-content: space-between;}
+        #schedule-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
+        #schedule-list::-webkit-scrollbar { display: none; }
+        #schedule-list li { 
+            font-size: 11px; color: #fff; margin-bottom: 5px; padding: 6px; 
+            background: rgba(0,0,0,0.2); border-radius: 8px; 
+            border-left: 3px solid #81D4FA; display: flex; flex-direction: column;
+            position: relative; animation: slideIn 0.3s ease;
+        }
+        .time-badge { font-weight: bold; color: #81D4FA; font-size: 10px; margin-bottom: 2px; }
+        .del-btn { position: absolute; right: 5px; top: 5px; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 10px; }
+        .del-btn:hover { color: #FF5252; }
+
+        /* --- 底部：生成式对话 UI --- */
+        #chat-layer {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 500px;
+            display: flex; flex-direction: column; justify-content: flex-end;
+            gap: 10px; z-index: 20; pointer-events: none;
+        }
+
+        /* 聊天流 (极简透明) */
+        #chat-history {
+            display: flex; flex-direction: column; gap: 8px; 
+            margin-bottom: 10px; padding-right: 5px;
+            align-items: center; /* 居中显示 */
+        }
+        
+        .msg {
+            max-width: 90%; padding: 8px 16px; border-radius: 20px; font-size: 13px; line-height: 1.5;
+            backdrop-filter: blur(4px); pointer-events: auto; 
+            animation: slideUp 0.4s ease;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            transition: opacity 1s, transform 1s; /* 淡出动画 */
+        }
+        
+        .msg-user { background: rgba(33, 150, 243, 0.4); color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .msg-ai { background: rgba(255, 255, 255, 0.25); color: white; border: 1px solid rgba(255,255,255,0.3); }
+        
+        /* 正在消失的类 */
+        .fading-out { opacity: 0; transform: translateY(-10px) scale(0.9); }
+
+        /* 生成式卡片容器 */
+        #card-deck {
+            display: flex; gap: 10px; overflow-x: auto; padding: 5px; pointer-events: auto;
+            justify-content: center; min-height: 5px;
+        }
+        #card-deck::-webkit-scrollbar { display: none; }
+
+        .activity-card {
+            min-width: 140px; 
+            background: rgba(255,255,255,0.2); backdrop-filter: blur(10px);
+            border-radius: 12px; padding: 10px; border: 1px solid rgba(255,255,255,0.4);
+            display: flex; flex-direction: column; gap: 4px;
+            cursor: pointer; transition: 0.2s; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        .activity-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.4); }
+        .act-time { font-size: 10px; color: #FFD54F; font-weight: bold; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; align-self: flex-start;}
+        .act-title { font-size: 13px; font-weight: bold; }
+        .act-desc { font-size: 11px; opacity: 0.9; }
+        .act-add { 
+            margin-top: 5px; background: rgba(76, 175, 80, 0.6); color: white; border: 1px solid rgba(255,255,255,0.3); 
+            padding: 4px; border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center;
+            transition: 0.2s;
+        }
+        .act-add:hover { background: rgba(76, 175, 80, 0.9); }
+
+        /* 输入框 (极透明) */
+        .input-box {
+            background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(10px);
+            border-radius: 25px; padding: 5px 5px 5px 15px;
+            display: flex; align-items: center; pointer-events: auto;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        input { 
+            flex: 1; border: none; background: transparent; outline: none; font-size: 14px; color: white; 
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        input::placeholder { color: rgba(255,255,255,0.6); }
+        .btn-send {
+            width: 36px; height: 36px; border-radius: 50%; border: none;
+            background: rgba(255, 255, 255, 0.2); color: white; font-size: 16px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: 0.2s;
+        }
+        .btn-send:hover { transform: scale(1.1); background: rgba(255, 255, 255, 0.4); }
+        .btn-send.loading { animation: spin 1s infinite linear; content: '⏳'; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* 警告弹窗 */
+        .toast {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+            color: white; padding: 10px 20px; border-radius: 8px;
+            font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 200;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+            backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 300;
+        }
+        .modal-content {
+            width: 90%; max-width: 360px; border-radius: 16px; padding: 16px;
+            background: rgba(255,255,255,0.25); color: white; border: 1px solid rgba(255,255,255,0.3);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .modal-title { font-size: 16px; font-weight: 800; }
+        .modal-close { cursor: pointer; font-size: 18px; opacity: 0.8; }
+        .modal-close:hover { opacity: 1; }
+        .modal-time { font-size: 12px; color: #FFD54F; margin-bottom: 6px; }
+        .modal-desc { font-size: 12px; opacity: 0.9; }
+        .modal-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .btn-primary { flex: 1; text-align: center; padding: 8px; border-radius: 10px; cursor: pointer; background: rgba(76,175,80,0.7); border: 1px solid rgba(255,255,255,0.3); }
+        .btn-primary:hover { background: rgba(76,175,80,0.9); }
+        .btn-secondary { flex: 1; text-align: center; padding: 8px; border-radius: 10px; cursor: pointer; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.35); }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+<!-- 警告/提示弹窗 -->
+<div id="toast" class="toast">时间冲突！</div>
+
+<!-- 左侧边栏 -->
+<div id="sidebar">
+    <!-- 天气控制 -->
+    <div class="glass-panel weather-row">
+        <div class="weather-icon active" onclick="setWeather('sunny')" title="晴朗">☀️</div>
+        <div class="weather-icon" onclick="setWeather('sunset')" title="暮色">🌇</div>
+        <div class="weather-icon" onclick="setWeather('night')" title="星空">🌙</div>
+    </div>
+
+    <!-- 日程表 -->
+    <div class="glass-panel">
+        <div class="panel-header">
+            <span>📅 陪伴计划</span>
+            <span style="font-weight:normal; font-size:10px; opacity:0.8" id="task-count">0/5</span>
+        </div>
+        <div id="empty-hint" style="font-size:11px; opacity:0.7; text-align:center; padding:10px;">告诉我你的心情...</div>
+        <ul id="schedule-list"></ul>
+    </div>
+</div>
+
+<!-- 底部生成式 UI -->
+<div id="chat-layer">
+    <div id="chat-history">
+        <!-- 消息会在这里生成，并自动消失 -->
+        <div class="msg msg-ai" id="intro-msg">嗨！我是你的疗愈小狗。今天感觉怎么样？</div>
+    </div>
+    
+    <!-- 动态生成的卡片流 -->
+    <div id="card-deck"></div>
+
+    <div class="input-box">
+        <input type="text" id="user-input" placeholder="输入想法 (如: 有点累)..." autocomplete="off">
+        <button class="btn-send" onclick="sendMessage()">➤</button>
+    </div>
+</div>
+
+<div id="activity-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div id="modal-title" class="modal-title"></div>
+            <div class="modal-close" onclick="closeActivityModal()">×</div>
+        </div>
+        <div id="modal-time" class="modal-time"></div>
+        <div id="modal-desc" class="modal-desc"></div>
+        <div class="modal-actions">
+            <div id="modal-add" class="btn-primary">添加到日程</div>
+            <div class="btn-secondary" onclick="closeActivityModal()">稍后</div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+    // 自动清理初始消息
+    setTimeout(() => {
+        const intro = document.getElementById('intro-msg');
+        if(intro) {
+            intro.classList.add('fading-out');
+            setTimeout(() => intro.remove(), 1000);
+        }
+    }, 5000);
+
+    // ==========================================
+    // 1. 逻辑核心 (日程 & Gemini API)
+    // ==========================================
+    
+    // --- 日程管理 ---
+    const schedule = []; 
+
+    function timeToMin(timeStr) {
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    function checkConflict(newStart, newEnd) {
+        for (let item of schedule) {
+            if (newStart < item.end && newEnd > item.start) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function addScheduleItem(title, timeStr, type) {
+        const times = timeStr.split('-');
+        if (times.length !== 2) return;
+        
+        const startMin = timeToMin(times[0]);
+        const endMin = timeToMin(times[1]);
+
+        if (checkConflict(startMin, endMin)) {
+            showToast(`⚠️ 冲突！时段 ${timeStr} 已占用`);
+            return false;
+        }
+
+        schedule.push({ title, start: startMin, end: endMin, timeStr, type });
+        schedule.sort((a, b) => a.start - b.start); 
+        
+        renderScheduleUI();
+        showToast("✅ 已添加: " + title);
+        return true;
+    }
+
+    function removeScheduleItem(index) {
+        schedule.splice(index, 1);
+        renderScheduleUI();
+    }
+
+    function renderScheduleUI() {
+        const list = document.getElementById('schedule-list');
+        const empty = document.getElementById('empty-hint');
+        const count = document.getElementById('task-count');
+        
+        list.innerHTML = '';
+        if(schedule.length === 0) empty.style.display = 'block';
+        else empty.style.display = 'none';
+
+        schedule.forEach((item, index) => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="time-badge">${item.timeStr}</div>
+                <div>${item.title}</div>
+                <span class="del-btn" onclick="removeScheduleItem(${index})">×</span>
+            `;
+            list.appendChild(li);
+        });
+        count.innerText = `${schedule.length}/8`;
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg; t.style.opacity = 1;
+        setTimeout(() => t.style.opacity = 0, 2000);
+    }
+
+    // --- Gemini API ---
+    const API_KEY = ''; // 🔴 请填入 API KEY
+    
+    async function callGemini(userText) {
+        if (!API_KEY) return mockResponse(userText);
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        const prompt = `
+        你是一个疗愈助手。用户输入: "${userText}"。
+        请返回JSON格式（不含Markdown）：
+        {
+            "reply": "简短温暖的安慰",
+            "activities": [
+                {"title": "活动", "time": "HH:MM-HH:MM", "desc": "简述"}
+            ],
+            "weather": "sunny" (sunny/sunset/night)
+        }
+        `;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+            const data = await response.json();
+            const text = data.candidates[0].content.parts[0].text;
+            const jsonStr = text.replace(/```json|```/g, '').trim();
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            console.error(e);
+            return mockResponse(userText);
+        }
+    }
+
+    function mockResponse(text) {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                if (text.includes("累") || text.includes("烦")) {
+                    resolve({
+                        reply: "深呼吸，把烦恼都呼出去吧~ 这里的风很温柔。",
+                        activities: [
+                            { title: "冥想放松", time: "20:00-20:30", desc: "放空大脑。" },
+                            { title: "听白噪音", time: "21:00-21:30", desc: "森林雨声。" }
+                        ],
+                        weather: "sunset"
+                    });
+                } else {
+                    resolve({
+                        reply: "我在听呢。无论怎样，这片森林永远为你敞开。",
+                        activities: [
+                            { title: "林间漫步", time: "16:00-17:00", desc: "看看绿植。" },
+                            { title: "阅读", time: "19:00-20:00", desc: "读一本好书。" }
+                        ],
+                        weather: "sunny"
+                    });
+                }
+            }, 600);
+        });
+    }
+
+    // --- 消息处理 (自动消失) ---
+    async function sendMessage() {
+        const input = document.getElementById('user-input');
+        const btn = document.querySelector('.btn-send');
+        const text = input.value.trim();
+        if (!text) return;
+
+        // 1. 显示用户消息
+        addMessage(text, 'user');
+        input.value = '';
+        btn.classList.add('loading');
+        btn.innerText = '';
+
+        // 2. 调用 AI
+        const data = await callGemini(text);
+        
+        // 3. 处理返回
+        btn.classList.remove('loading');
+        btn.innerText = '➤';
+        addMessage(data.reply, 'ai');
+        
+        // 4. 生成卡片
+        if (data.activities && data.activities.length > 0) {
+            renderCards(data.activities);
+        }
+        
+        // 5. 切换环境
+        if (data.weather) setWeather(data.weather);
+    }
+
+    function addMessage(text, type) {
+        const container = document.getElementById('chat-history');
+        const div = document.createElement('div');
+        div.className = `msg msg-${type}`;
+        div.innerText = text;
+        container.appendChild(div);
+
+        // 【关键】：5秒后自动移除消息
+        setTimeout(() => {
+            div.classList.add('fading-out');
+            setTimeout(() => div.remove(), 1000); // 等待动画结束
+        }, 5000);
+    }
+
+    function renderCards(activities) {
+        const deck = document.getElementById('card-deck');
+        deck.innerHTML = '';
+        
+        activities.forEach(act => {
+            const card = document.createElement('div');
+            card.className = 'activity-card';
+            card.innerHTML = `
+                <div class="act-time">${act.time}</div>
+                <div class="act-title">${act.title}</div>
+                <div class="act-desc">${act.desc}</div>
+                <div class="act-add">＋</div>
+            `;
+            card.onclick = () => {
+                openActivityModal(act);
+            };
+            const addBtn = card.querySelector('.act-add');
+            addBtn.onclick = (e) => {
+                e.stopPropagation();
+                const success = addScheduleItem(act.title, act.time, 'TODO');
+                if (success) {
+                    card.style.transform = 'scale(0)';
+                    setTimeout(() => card.remove(), 300);
+                }
+            };
+            deck.appendChild(card);
+        });
+    }
+
+    function openActivityModal(act) {
+        const overlay = document.getElementById('activity-modal');
+        document.getElementById('modal-title').innerText = act.title;
+        document.getElementById('modal-time').innerText = act.time;
+        document.getElementById('modal-desc').innerText = act.desc;
+        const add = document.getElementById('modal-add');
+        add.onclick = () => {
+            const success = addScheduleItem(act.title, act.time, 'TODO');
+            if (success) closeActivityModal();
+        };
+        overlay.style.display = 'flex';
+    }
+
+    function closeActivityModal() {
+        const overlay = document.getElementById('activity-modal');
+        overlay.style.display = 'none';
+    }
+    
+    document.getElementById('user-input').addEventListener('keypress', (e) => {
+        if(e.key === 'Enter') sendMessage();
+    });
+
+
+    // ==========================================
+    // 2. 3D 场景 (Original Corgi)
+    // ==========================================
+    
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB); 
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
+    camera.position.set(0, 4, 6); 
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+    document.body.appendChild(renderer.domElement); 
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.minDistance = 2; controls.maxDistance = 20;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05; 
+    controls.target.set(0, 0.5, 0);
+    controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+
+    // --- 场景物体构建 ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const targetRing = new THREE.Mesh(new THREE.RingGeometry(0.25, 0.35, 32), new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
+    targetRing.rotation.x = -Math.PI / 2; targetRing.visible = false; scene.add(targetRing);
+
+    const STATE = { IDLE: 0, RUN: 1, BELLY: 2 };
+    let currentState = STATE.IDLE;
+    const targetPos = new THREE.Vector3();
+    const dogPos = new THREE.Vector3(0, 0, 0); 
+    const dogSpeed = 0.11; 
+
+    // --- 构建原始 Low Poly 柯基 (Original) ---
+    const corgiGroup = new THREE.Group();
+    const corgiBody = new THREE.Group(); 
+    const headGroup = new THREE.Group(); 
+    corgiGroup.add(corgiBody); scene.add(corgiGroup);
+    const legs = []; let tail, earL, earR;
+
+    function createOriginalCorgi() {
+        const matOrange = new THREE.MeshStandardMaterial({ color: 0xE69A45, roughness: 1.0, flatShading: true });
+        const matWhite = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 1.0, flatShading: true });
+        const matBlack = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1.0, flatShading: true });
+
+        // Body
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.7, 8), matOrange);
+        body.rotation.x = Math.PI / 2; body.position.y = 0.35; body.castShadow = true; corgiBody.add(body);
+        
+        const belly = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.6), matWhite);
+        belly.position.y = 0.28; corgiBody.add(belly);
+
+        const butt = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25, 0), matOrange);
+        butt.position.set(0, 0.4, -0.35); corgiBody.add(butt);
+
+        tail = new THREE.Mesh(new THREE.DodecahedronGeometry(0.08, 0), matOrange);
+        tail.position.set(0, 0.45, -0.5); corgiBody.add(tail);
+
+        headGroup.position.set(0, 0.65, 0.4); corgiBody.add(headGroup);
+        const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35, 0), matOrange);
+        head.castShadow = true; headGroup.add(head);
+
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.1), matWhite);
+        stripe.position.set(0, 0.15, 0.28); stripe.rotation.x = -0.5; headGroup.add(stripe);
+
+        const snout = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.2), matWhite);
+        snout.position.set(0, -0.1, 0.25); headGroup.add(snout);
+        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.06), matBlack);
+        nose.position.set(0, -0.05, 0.35); headGroup.add(nose);
+
+        const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), matBlack); eyeL.position.set(0.15, 0.05, 0.3); headGroup.add(eyeL);
+        const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), matBlack); eyeR.position.set(-0.15, 0.05, 0.3); headGroup.add(eyeR);
+
+        const earGeo = new THREE.ConeGeometry(0.12, 0.3, 4); 
+        earL = new THREE.Group(); earL.position.set(0.2, 0.25, 0);
+        const earLMesh = new THREE.Mesh(earGeo, matOrange); earLMesh.rotation.set(-0.2, 0, -0.3); earLMesh.position.y=0.15;
+        earL.add(earLMesh); headGroup.add(earL);
+        earR = new THREE.Group(); earR.position.set(-0.2, 0.25, 0);
+        const earRMesh = new THREE.Mesh(earGeo, matOrange); earRMesh.rotation.set(-0.2, 0, 0.3); earRMesh.position.y=0.15;
+        earR.add(earRMesh); headGroup.add(earR);
+
+        const legGeo = new THREE.BoxGeometry(0.12, 0.25, 0.12);
+        const legPos = [{x:0.15, z:0.2}, {x:-0.15, z:0.2}, {x:0.15, z:-0.2}, {x:-0.15, z:-0.2}];
+        legPos.forEach(p => {
+            const legG = new THREE.Group(); legG.position.set(p.x, 0.2, p.z); corgiBody.add(legG);
+            const l = new THREE.Mesh(legGeo, matWhite); l.position.y = -0.1; l.castShadow = true; legG.add(l);
+            legs.push(legG);
+        });
+    }
+    createOriginalCorgi();
+
+    // --- 交互点击 ---
+    window.addEventListener('pointerup', (e) => {
+        if(e.button !== 0 || e.target.closest('.glass-panel') || e.target.closest('#chat-layer')) return;
+
+        mouse.x = (e.clientX/window.innerWidth)*2-1; mouse.y = -(e.clientY/window.innerHeight)*2+1;
+        raycaster.setFromCamera(mouse, camera);
+
+        const hits = raycaster.intersectObject(ground);
+        if(hits.length > 0) {
+            const p = hits[0].point;
+            targetPos.copy(p);
+            targetRing.position.set(p.x, 0.05, p.z);
+            targetRing.visible = true; targetRing.scale.set(0,0,0);
+            if(targetRing.userData.anim) clearInterval(targetRing.userData.anim);
+            let s=0; targetRing.userData.anim = setInterval(()=>{ s+=0.2; targetRing.scale.set(s,s,s); if(s>=1)clearInterval(targetRing.userData.anim);},16);
+            currentState = STATE.RUN;
+        }
+    });
+
+    // --- 环境生成 (Dense Original) ---
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ color: 0x33691E, roughness: 1, flatShading: true }));
+    ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+
+    function createNature() {
+        const treeMat = new THREE.MeshStandardMaterial({color: 0x5D4037, flatShading:true});
+        const leafMat = new THREE.MeshStandardMaterial({color: 0x2E7D32, flatShading:true});
+        const treeGeo = new THREE.CylinderGeometry(0, 0.4, 3, 6);
+        const leafGeo = new THREE.DodecahedronGeometry(1.2, 0);
+        
+        for(let i=0; i<300; i++) { // 高密度
+            const x=(Math.random()-0.5)*150, z=(Math.random()-0.5)*150;
+            if(Math.abs(x)<5 && Math.abs(z)<5) continue;
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(treeGeo, treeMat); trunk.position.y=1.5; tree.add(trunk);
+            const leaf = new THREE.Mesh(leafGeo, leafMat); leaf.position.y=3; tree.add(leaf);
+            tree.position.set(x,0,z); tree.scale.setScalar(1+Math.random()*0.5);
+            scene.add(tree);
+        }
+        // 远山
+        const mountMat = new THREE.MeshStandardMaterial({color: 0x4CAF50, flatShading:true});
+        for(let i=0; i<20; i++) {
+            const angle = Math.random()*Math.PI*2;
+            const r = 100 + Math.random()*30;
+            const s = 20 + Math.random()*20;
+            const m = new THREE.Mesh(new THREE.SphereGeometry(s,8,6,0,Math.PI*2,0,Math.PI*0.5), mountMat);
+            m.position.set(Math.cos(angle)*r, -2, Math.sin(angle)*r);
+            m.scale.y = 1+Math.random();
+            scene.add(m);
+        }
+    }
+    createNature();
+
+    // --- 光照 ---
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6); scene.add(hemiLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); 
+    dirLight.position.set(50, 50, 20); dirLight.castShadow = true; 
+    dirLight.shadow.mapSize.set(2048, 2048);
+    const d=80; dirLight.shadow.camera.left=-d; dirLight.shadow.camera.right=d; dirLight.shadow.camera.top=d; dirLight.shadow.camera.bottom=-d;
+    scene.add(dirLight);
+
+    window.setWeather = function(type) {
+        document.querySelectorAll('.weather-icon').forEach(el => el.classList.remove('active'));
+        if(type==='sunny') { scene.background.set(0x87CEEB); dirLight.color.set(0xFFD700); dirLight.intensity=1.5; hemiLight.intensity=0.6; scene.fog=new THREE.Fog(0x87CEEB, 20, 100);}
+        else if(type==='sunset') { scene.background.set(0xFFCCBC); dirLight.color.set(0xFF5722); dirLight.intensity=1.2; hemiLight.intensity=0.5; scene.fog=new THREE.Fog(0xFFCCBC, 15, 80);}
+        else { scene.background.set(0x1a237e); dirLight.color.set(0x7986CB); dirLight.intensity=0.5; hemiLight.intensity=0.2; scene.fog=new THREE.Fog(0x1a237e, 10, 60);}
+    }
+    window.setWeather('sunny');
+
+    // --- 动画循环 ---
+    const clock = new THREE.Clock();
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = Date.now() * 0.001;
+        const dt = clock.getDelta();
+
+        if(currentState === STATE.RUN) {
+            const dist = dogPos.distanceTo(targetPos);
+            if(dist > 0.1) {
+                const dir = targetPos.clone().sub(dogPos).normalize();
+                dogPos.addScaledVector(dir, dogSpeed);
+                const angle = Math.atan2(dir.x, dir.z);
+                let diff = angle - corgiGroup.rotation.y;
+                while(diff>Math.PI) diff-=Math.PI*2; while(diff<-Math.PI) diff+=Math.PI*2;
+                corgiGroup.rotation.y += diff*0.15;
+                // 跑动
+                legs[0].rotation.x = Math.sin(time*15)*0.6; legs[1].rotation.x = Math.cos(time*15)*0.6;
+                legs[2].rotation.x = Math.cos(time*15)*0.6; legs[3].rotation.x = Math.sin(time*15)*0.6;
+                corgiBody.position.y = Math.abs(Math.sin(time*30))*0.02;
+            } else {
+                currentState = STATE.IDLE; targetRing.visible = false;
+                legs.forEach(l=>l.rotation.x=0); corgiBody.position.y=0;
+            }
+        } else {
+            corgiBody.scale.y = 1 + Math.sin(time*3)*0.01;
+            tail.rotation.z = Math.sin(time*5)*0.5;
+        }
+
+        corgiGroup.position.copy(dogPos);
+        
+        // 相机跟随
+        const targetCam = dogPos.clone().add(new THREE.Vector3(0, 0.6, 0));
+        controls.target.lerp(targetCam, 0.1);
+        const camOffset = camera.position.clone().sub(controls.target);
+        if(camOffset.length() > 8) camera.position.lerp(controls.target.clone().add(camOffset.normalize().multiplyScalar(8)), 0.1);
+        controls.update();
+
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+</body>
+</html>
