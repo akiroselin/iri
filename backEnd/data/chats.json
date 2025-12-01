@@ -1,0 +1,72 @@
+[
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "心情有点烦躁",
+    "timestamp": "2025-12-01T01:56:40.526Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "看起来你最近承担了很多。请允许自己停下来休息一会儿，你已经做得很好了。抱抱自己。",
+    "weather": "night",
+    "activities": [
+      {
+        "title": "冥想放松",
+        "time": "20:00-20:30",
+        "desc": "放空大脑，专注呼吸。"
+      },
+      {
+        "title": "温暖沐浴",
+        "time": "21:00-21:30",
+        "desc": "热水澡能缓解疲劳。"
+      }
+    ],
+    "timestamp": "2025-12-01T01:56:51.060Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "今天有点烦",
+    "timestamp": "2025-12-01T01:57:33.675Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "看起来你最近承担了很多。请允许自己停下来休息一会儿，你已经做得很好了。抱抱自己。",
+    "weather": "night",
+    "activities": [
+      {
+        "title": "冥想放松",
+        "time": "20:00-20:30",
+        "desc": "放空大脑，专注呼吸。"
+      },
+      {
+        "title": "温暖沐浴",
+        "time": "21:00-21:30",
+        "desc": "热水澡能缓解疲劳。"
+      }
+    ],
+    "timestamp": "2025-12-01T01:57:44.180Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "今天很开心",
+    "timestamp": "2025-12-01T02:22:19.957Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "真为你感到高兴！保持这种积极的状态，世界也会变得明亮起来。",
+    "weather": "sunny",
+    "activities": [
+      {
+        "title": "记录美好",
+        "time": "Now",
+        "desc": "写下此刻的开心瞬间。"
+      }
+    ],
+    "timestamp": "2025-12-01T02:22:30.459Z"
+  }
+]
