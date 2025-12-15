@@ -6,13 +6,20 @@ router.post('/login', (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-    let user = db.findUser(email);
+    const emailNorm = String(email).trim().toLowerCase();
+    const passNorm = String(password).trim();
+    let user = db.findUser(emailNorm);
     if (!user) {
         return res.status(401).json({ error: 'User not found. Please register.' });
     } 
     
+    // Legacy: if user has no password stored, set it now
+    if (typeof user.password !== 'string' || user.password.trim() === '') {
+        const updated = db.updateUser(emailNorm, { password: passNorm });
+        user = updated || user;
+    }
     // Verify password
-    if (user.password !== password) {
+    if (String(user.password).trim() !== passNorm) {
         return res.status(401).json({ error: 'Invalid password' });
     }
 
@@ -23,13 +30,15 @@ router.post('/register', (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-    if (db.findUser(email)) {
+    const emailNorm = String(email).trim().toLowerCase();
+    const passNorm = String(password).trim();
+    if (db.findUser(emailNorm)) {
         return res.status(409).json({ error: 'User already exists' });
     }
 
     const user = { 
-        email, 
-        password, // In production, hash this!
+        email: emailNorm, 
+        password: passNorm, // In production, hash this!
         joinedAt: new Date().toISOString(),
         moodHistory: [],
         petConfig: null,

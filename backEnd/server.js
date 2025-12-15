@@ -18,6 +18,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/user', userRoutes);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Backend server running on http://localhost:${PORT}`);
+});
+
+server.on('error', (e) => {
+    console.error('Server error:', e);
 });

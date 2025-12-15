@@ -82,6 +82,9 @@ async function callOllamaAPI(userText, petType) {
     `;
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -90,8 +93,10 @@ async function callOllamaAPI(userText, petType) {
                 prompt: prompt,
                 stream: false,
                 format: "json"
-            })
+            }),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (!response.ok) throw new Error('Ollama API Error');
         const data = await response.json();
@@ -132,18 +137,28 @@ async function callGeminiAPI(userText, petType) {
     }
     `;
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-    });
-    
-    if (!response.ok) throw new Error('Gemini API Error');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout for Gemini
 
-    const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text;
-    const jsonStr = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(jsonStr);
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) throw new Error('Gemini API Error');
+
+        const data = await response.json();
+        const text = data.candidates[0].content.parts[0].text;
+        const jsonStr = text.replace(/```json|```/g, '').trim();
+        return JSON.parse(jsonStr);
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
 }
 
 router.post('/message', async (req, res) => {

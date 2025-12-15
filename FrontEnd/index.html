@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>Healing Corgi Space (Final)</title>
+    <title>搭子计划</title>
     <style>
         body { 
             margin: 0; overflow: hidden; background-color: #87CEEB; 
@@ -261,8 +261,7 @@
 
 <!-- 宠物选择器 -->
 <div id="pet-selector">
-    <div class="pet-option active" onclick="selectPet('buffalo')" title="呆萌水牛">🐮</div>
-    <div class="pet-option" onclick="selectPet('corgi')" title="柯基">🐶</div>
+    <div class="pet-option active" onclick="selectPet('corgi')" title="柯基">🐶</div>
     <div class="pet-option" onclick="selectPet('rabbit')" title="小白兔">🐰</div>
     <div class="pet-option" onclick="selectPet('cat')" title="小花猫">🐱</div>
 </div>
@@ -303,7 +302,7 @@
     <!-- 日程表 -->
     <div class="glass-panel">
         <div class="panel-header">
-            <span>📅 陪伴计划</span>
+            <span>📅 搭子计划</span>
             <span style="font-weight:normal; font-size:10px; opacity:0.8" id="task-count">0/5</span>
         </div>
         <div id="empty-hint" style="font-size:11px; opacity:0.7; text-align:center; padding:10px;">告诉我你的心情...</div>
@@ -342,10 +341,55 @@
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+    (function(){
+        function loadScript(src){
+            return new Promise(function(resolve){
+                var s=document.createElement('script');
+                s.src=src; s.async=true;
+                s.onload=function(){ resolve(true); };
+                s.onerror=function(){ resolve(false); };
+                document.head.appendChild(s);
+            });
+        }
+        async function ensureThree(){
+            if(window.THREE) return true;
+            let loaded=false;
+            // Prefer local first (no HEAD probing to avoid abort logs)
+            if(await loadScript('./lib/three.min.js')){ loaded=!!window.THREE; }
+            if(!loaded){
+                const threeCDNs = [
+                    'https://unpkg.com/three@0.128.0/build/three.min.js',
+                    'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+                ];
+                for(let src of threeCDNs){
+                    const ok = await loadScript(src);
+                    if(ok && window.THREE){ loaded=true; break; }
+                }
+            }
+            if(!loaded){ console.warn('Three.js not loaded, running in text-only mode'); return false; }
+            let ctrlLoaded=false;
+            if(await loadScript('./lib/OrbitControls.js')){ ctrlLoaded=!!THREE.OrbitControls; }
+            if(!ctrlLoaded){
+                const ctrlCDNs = [
+                    'https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js',
+                    'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js'
+                ];
+                for(let src of ctrlCDNs){
+                    const ok = await loadScript(src);
+                    if(ok && THREE.OrbitControls){ ctrlLoaded=true; break; }
+                }
+            }
+            return loaded && ctrlLoaded;
+        }
+        window.__ensureThree = ensureThree;
+    })();
+</script>
 
 <script>
+    if(!window.THREE){
+        try{ document.getElementById('intro-msg').innerText = '三维库加载失败，请检查网络连接'; }catch(e){}
+    }
     // 自动清理初始消息
     setTimeout(() => {
         const intro = document.getElementById('intro-msg');
@@ -411,41 +455,48 @@
     }
 
     window.restorePet = function(config) {
-         if(!config || !config.type) return;
-         currentPet = config.type;
-         corgiGroup.userData.traits = config.traits || generatePetTraits();
-         
-         // Update UI
-         document.querySelectorAll('.pet-option').forEach(el => el.classList.remove('active'));
-         const btn = document.querySelector(`.pet-option[onclick="selectPet('${currentPet}')"]`);
-         if(btn) btn.classList.add('active');
-
-         rebuildPet();
+        if(!config || !config.type) return;
+        const allowed = ['corgi','rabbit','cat'];
+        currentPet = allowed.includes(config.type) ? config.type : 'corgi';
+        if(!window.THREE || !window.corgiGroup){
+            window.pendingPetConfig = config;
+            const btn = document.querySelector(`.pet-option[onclick="selectPet('${currentPet}')"]`);
+            if(btn){
+                document.querySelectorAll('.pet-option').forEach(el => el.classList.remove('active'));
+                btn.classList.add('active');
+            }
+            return;
+        }
+        window.corgiGroup.userData.traits = config.traits || generatePetTraits();
+        document.querySelectorAll('.pet-option').forEach(el => el.classList.remove('active'));
+        const btn = document.querySelector(`.pet-option[onclick="selectPet('${currentPet}')"]`);
+        if(btn) btn.classList.add('active');
+        rebuildPet();
     }
 
     function rebuildPet() {
+        if(!window.THREE || !window.corgiGroup) return;
         const type = currentPet;
         // Base Scale
         let baseScale = 1;
-        if(type === 'buffalo') baseScale = 0.65; // Reduced by half as requested
-        else if(type === 'corgi') baseScale = 0.9;
+        if(type === 'corgi') baseScale = 0.7; // Slightly larger than cat (0.6)
         else baseScale = 0.6;
 
         // Apply body scale trait to the whole group for simplicity, 
         // or we can pass traits to create functions for more detail.
         // Let's pass traits to create functions implicitly via corgiGroup.userData.traits
         
-        const traits = corgiGroup.userData.traits || generatePetTraits();
-        corgiGroup.scale.setScalar(baseScale * traits.bodyScale);
+        const traits = window.corgiGroup.userData.traits || generatePetTraits();
+        window.corgiGroup.scale.setScalar(baseScale * traits.bodyScale);
 
-        if(type === 'buffalo') createBuffalo();
-        else if(type === 'corgi') createCorgi();
-        else if(type === 'rabbit') createRabbit();
-        else if(type === 'cat') createCat();
+        if(type === 'corgi' && window.createCorgi) window.createCorgi();
+        else if(type === 'rabbit' && window.createRabbit) window.createRabbit();
+        else if(type === 'cat' && window.createCat) window.createCat();
+        else if(window.createCorgi) window.createCorgi();
         
         // Reset position
-        corgiBody.position.set(0,0,0);
-        corgiBody.rotation.set(0,0,0);
+        window.corgiBody.position.set(0,0,0);
+        window.corgiBody.rotation.set(0,0,0);
     }
 
     function removeScheduleItem(index) {
@@ -483,6 +534,16 @@
     
     function closeMessageModal() {
         document.getElementById('message-modal').style.display = 'none';
+    }
+
+    if(!window.petStatus){ window.petStatus = { mood: 80, health: 90, gloss: 75 }; }
+    var petStatus = window.petStatus;
+    if(typeof updateStatusUI !== 'function'){
+        function updateStatusUI(){
+            var m=document.getElementById('bar-mood'); if(m) m.style.width = window.petStatus.mood + '%';
+            var h=document.getElementById('bar-health'); if(h) h.style.width = window.petStatus.health + '%';
+            var g=document.getElementById('bar-gloss'); if(g) g.style.width = window.petStatus.gloss + '%';
+        }
     }
 
     // --- Backend Integration ---
@@ -533,6 +594,8 @@
     }
     setTimeout(loadAuthHistory, 500); // Wait for DOM
 
+    if(!window.handleAuth){ window.handleAuth = function(){ alert('正在加载，请稍候'); }; }
+
     async function handleAuth() {
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-pass').value.trim();
@@ -570,12 +633,10 @@
             petStatus.gloss = 75;
             updateStatusUI();
 
-            // Load saved pet CONFIG only (Traits/Type)
-            if(currentUser.petConfig) {
+            if(window.THREE && typeof restorePet==='function' && currentUser.petConfig){
                 restorePet(currentUser.petConfig);
-            } else {
-                // First time: Randomize initial pet (buffalo default)
-                selectPet('buffalo'); 
+            } else if(window.THREE && typeof selectPet==='function'){
+                selectPet('corgi');
             }
 
             if(currentUser.schedule) {
@@ -627,13 +688,8 @@
             container.removeChild(container.firstChild);
         }
     }
-    let currentPet = 'buffalo';
+    let currentPet = 'corgi';
     const PET_BEHAVIOR_TEXT = {
-        buffalo: { 
-            idle: ["在找嫩草...", "发呆中...", "哞..."],
-            click: ["(蹭蹭你的手)", "哞~ 舒服~", "(憨厚地看着你)"],
-            move: "慢慢走过去..."
-        },
         corgi: { 
             idle: ["到处闻闻...", "追尾巴...", "汪？"],
             click: ["(疯狂摇尾巴)", "汪汪！抱抱！", "(在地上打滚)"],
@@ -652,10 +708,9 @@
     };
 
     const PET_PERSONALITY = {
-        buffalo: { type: "gentle", sniffChance: 0.3, probeChance: 0.2 }, 
-        corgi: { type: "energetic", sniffChance: 0.7, probeChance: 0.6 }, 
-        rabbit: { type: "timid", sniffChance: 0.2, probeChance: 0.1 }, 
-        cat: { type: "arrogant", sniffChance: 0.4, probeChance: 0.5 } 
+        corgi: { type: "energetic", sniffChance: 0.016, probeChance: 0.012 }, 
+        rabbit: { type: "timid", sniffChance: 0.01, probeChance: 0.01 }, 
+        cat: { type: "arrogant", sniffChance: 0.012, probeChance: 0.016 } 
     };
 
     // --- 消息处理 ---
@@ -664,6 +719,8 @@
         const btn = document.querySelector('.btn-send');
         const text = input.value.trim();
         if (!text) return;
+        lastOwnerInteractionTime = Date.now() * 0.001;
+        didWanderAfterOwnerIdle = false;
 
         // 1. 显示用户消息
         addMessage(text, 'user');
@@ -708,36 +765,34 @@
     }
 
     function mockResponse(text) {
-         return new Promise(resolve => {
-            setTimeout(() => {
-                let reply = "我听到了你的心声。生活总会有起伏，试着深呼吸，感受当下的平静。";
-                let weather = "sunset";
-                let activities = [];
-                
-                const petNames = { buffalo: "水牛", corgi: "柯基", rabbit: "小白兔", cat: "小猫" };
-                const pName = petNames[currentPet] || "宠物";
+         return Promise.resolve().then(() => {
+            let reply = "我听到了你的心声。生活总会有起伏，试着深呼吸，感受当下的平静。";
+            let weather = "sunset";
+            let activities = [];
+            
+            const petNames = { corgi: "柯基", rabbit: "小白兔", cat: "小猫" };
+            const pName = petNames[currentPet] || "宠物";
 
-                if (text.includes("它") || text.includes("宠物") || text.includes("狗") || text.includes("牛") || text.includes("兔") || text.includes("猫")) {
-                    if(text.includes("喜欢")) {
-                        reply = `${pName}最喜欢你的陪伴了，当然还有美味的零食和舒服的抚摸。`;
-                    } else if(text.includes("干什么") || text.includes("在做")) {
-                        reply = `${pName}正享受着悠闲的时光呢，可能在发呆，也可能在想你。`;
-                    } else {
-                        reply = `${pName}似乎很在意你，它会一直静静地陪着你。`;
-                    }
-                    weather = "sunny";
+            if (text.includes("它") || text.includes("宠物") || text.includes("狗") || text.includes("兔") || text.includes("猫")) {
+                if(text.includes("喜欢")) {
+                    reply = `${pName}最喜欢你的陪伴了，当然还有美味的零食和舒服的抚摸。`;
+                } else if(text.includes("干什么") || text.includes("在做")) {
+                    reply = `${pName}正享受着悠闲的时光呢，可能在发呆，也可能在想你。`;
+                } else {
+                    reply = `${pName}似乎很在意你，它会一直静静地陪着你。`;
                 }
-                else if (text.includes("累") || text.includes("烦") || text.includes("难过") || text.includes("压力")) {
-                    reply = "看起来你最近承担了很多。请允许自己停下来休息一会儿，你已经做得很好了。抱抱自己。";
-                    weather = "night";
-                } else if (text.includes("开心") || text.includes("好") || text.includes("棒") || text.includes("顺")) {
-                    reply = "真为你感到高兴！保持这种积极的状态，世界也会变得明亮起来。";
-                    weather = "sunny";
-                    activities = [{ title: "记录美好", time: "Now", desc: "写下此刻的开心瞬间。" }];
-                }
+                weather = "sunny";
+            }
+            else if (text.includes("累") || text.includes("烦") || text.includes("难过") || text.includes("压力")) {
+                reply = "看起来你最近承担了很多。请允许自己停下来休息一会儿，你已经做得很好了。抱抱自己。";
+                weather = "night";
+            } else if (text.includes("开心") || text.includes("好") || text.includes("棒") || text.includes("顺")) {
+                reply = "真为你感到高兴！保持这种积极的状态，世界也会变得明亮起来。";
+                weather = "sunny";
+                activities = [{ title: "记录美好", time: "Now", desc: "写下此刻的开心瞬间。" }];
+            }
 
-                resolve({ reply, activities, weather });
-            }, 600);
+            return { reply, activities, weather };
         });
     }
 
@@ -818,15 +873,51 @@
         if(e.key === 'Enter') sendMessage();
     });
 
+    if(typeof window.setWeather !== 'function'){
+        window.setWeather = function(type){};
+    }
+    if(typeof window.selectPet !== 'function'){
+        window.selectPet = function(type){
+            currentPet = type;
+            document.querySelectorAll('.pet-option').forEach(el => el.classList.remove('active'));
+            const btn = document.querySelector(`.pet-option[onclick="selectPet('${type}')"]`);
+            if(btn) btn.classList.add('active');
+        };
+    }
 
     // ==========================================
     // 2. 3D 场景 (Original Corgi)
     // ==========================================
     
+    if(!window.THREE){
+        document.body.style.background = 'linear-gradient(180deg,#1A237E,#E0F7FA)';
+        try{
+            const warn = document.createElement('div');
+            warn.id = 'runtime-warning';
+            warn.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(255,255,255,0.9);color:#333;padding:10px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+            warn.innerText = '三维库未加载，正在尝试备用来源...';
+            document.body.appendChild(warn);
+            const ps=document.getElementById('pet-selector'); if(ps) ps.style.display='none';
+            const ip=document.getElementById('interaction-panel'); if(ip) ip.style.display='none';
+            addMessage('三维库未加载，当前为纯文字模式','ai', false);
+            if(typeof window.__ensureThree==='function'){
+                window.__ensureThree().then(function(ok){
+                    if(ok){ try{ document.getElementById('runtime-warning').remove(); }catch(e){}
+                        if(typeof window.initThreeScene==='function'){ window.initThreeScene(); }
+                    } else {
+                        warn.innerText = '三维库未加载，建议用系统浏览器打开 http://localhost:8080/ 或检查网络';
+                    }
+                });
+            }
+        }catch(e){}
+    }
+    function initThreeScene() {
+    if (!window.THREE || !THREE.OrbitControls) return;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB); 
 
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
+    // Increased far plane for smoother mountain visibility
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 8000);
     camera.position.set(0, 4, 6); 
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -838,12 +929,17 @@
     renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
     document.body.appendChild(renderer.domElement); 
 
+    var psReady=document.getElementById('pet-selector'); if(psReady) psReady.style.display='flex';
+    var ipReady=document.getElementById('interaction-panel'); if(ipReady) ipReady.style.display='flex';
+
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.minDistance = 2; controls.maxDistance = 20;
     controls.maxPolarAngle = Math.PI / 2 - 0.05; 
     controls.target.set(0, 0.5, 0);
     controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+    renderer.domElement.addEventListener('mousedown', (e) => { if(e.button===2) controls.enableRotate = true; });
+    window.addEventListener('mouseup', (e) => { if(e.button===2) controls.enableRotate = false; });
 
     // --- 场景物体构建 ---
     const raycaster = new THREE.Raycaster();
@@ -855,11 +951,14 @@
     let currentState = STATE.IDLE;
     const targetPos = new THREE.Vector3();
     const dogPos = new THREE.Vector3(0, 0, 0); 
-    const dogSpeed = 0.07; 
+    const dogSpeed = 0.04; 
+    const WORLD_RADIUS = 90;
 
     // --- 宠物构建系统 ---
     const corgiGroup = new THREE.Group();
+    window.corgiGroup = corgiGroup;
     const corgiBody = new THREE.Group(); 
+    window.corgiBody = corgiBody;
     const headGroup = new THREE.Group(); 
     corgiGroup.add(corgiBody); scene.add(corgiGroup);
     let legs = []; let tail;
@@ -871,173 +970,117 @@
         legs = [];
     }
 
-    // 1. 呆萌水牛 (Buffalo)
-    function createBuffalo() {
-        clearPet();
-        const traits = corgiGroup.userData.traits || { bodyScale:1, headScale:1, earScale:1 };
-        
-        const matBody = new THREE.MeshStandardMaterial({ color: 0x5D4037, roughness: 1.0 });
-        const matHorn = new THREE.MeshStandardMaterial({ color: 0xEFEBE9, roughness: 0.5 });
-        const matSnout = new THREE.MeshStandardMaterial({ color: 0xD7CCC8, roughness: 0.8 });
-        const matEye = new THREE.MeshStandardMaterial({ color: 0xFFFFFF });
-        const matPupil = new THREE.MeshStandardMaterial({ color: 0x000000 });
+    // 1. 呆萌水牛 (Buffalo) - Removed per user request
 
-        // Body (Less fat)
-        const body = new THREE.Mesh(new THREE.SphereGeometry(0.45 * traits.bodyScale, 32, 32), matBody);
-        body.position.y = 0.45; body.scale.set(1.1, 1.1, 1.2); body.castShadow = true;
-        corgiBody.add(body);
 
-        // Tail
-        tail = new THREE.Group(); tail.position.set(0, 0.4, -0.45);
-        const tailMesh = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), matBody);
-        tail.add(tailMesh); corgiBody.add(tail);
-
-        // Head
-        const headR = 0.32 * traits.headScale;
-        headGroup.position.set(0, 0.65, 0.35); 
-        const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 32, 32), matBody);
-        head.castShadow = true; headGroup.add(head);
-
-        // Snout
-        const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.1, 32), matSnout);
-        snout.rotation.x = Math.PI/2; snout.position.set(0, -0.05, 0.28); snout.scale.set(1.5, 0.8, 1);
-        headGroup.add(snout);
-
-        // Horns (Prominent on head)
-        const hornGeo = new THREE.TorusGeometry(0.15, 0.04, 12, 32, Math.PI);
-        const hL = new THREE.Mesh(hornGeo, matHorn); 
-        hL.position.set(0.2, 0.15, 0.1); hL.rotation.set(0, 0, 2.5); 
-        headGroup.add(hL);
-        
-        const hR = new THREE.Mesh(hornGeo, matHorn); 
-        hR.position.set(-0.2, 0.15, 0.1); hR.rotation.set(0, Math.PI, 2.5); 
-        headGroup.add(hR);
-
-        // Eyes (Cross-eyed)
-        const eyeGeo = new THREE.SphereGeometry(0.07, 32, 32);
-        const pupilGeo = new THREE.SphereGeometry(0.03, 32, 32);
-        const eL = new THREE.Group(); eL.position.set(0.14, 0.1, 0.25);
-        eL.add(new THREE.Mesh(eyeGeo, matEye)); 
-        const pL = new THREE.Mesh(pupilGeo, matPupil); pL.position.set(-0.03, 0, 0.06); eL.add(pL); headGroup.add(eL);
-        
-        const eR = new THREE.Group(); eR.position.set(-0.14, 0.1, 0.25);
-        eR.add(new THREE.Mesh(eyeGeo, matEye));
-        const pR = new THREE.Mesh(pupilGeo, matPupil); pR.position.set(0.03, 0, 0.06); eR.add(pR); headGroup.add(eR);
-
-        // Ears
-        const earGeo = new THREE.ConeGeometry(0.08 * traits.earScale, 0.2 * traits.earScale, 32);
-        const earL = new THREE.Group(); earL.position.set(0.32, 0, 0);
-        earL.add(new THREE.Mesh(earGeo, matBody)); headGroup.add(earL);
-        earL.children[0].rotation.set(0, 0, -1.5);
-
-        const earR = new THREE.Group(); earR.position.set(-0.32, 0, 0);
-        earR.add(new THREE.Mesh(earGeo, matBody)); headGroup.add(earR);
-        earR.children[0].rotation.set(0, 0, 1.5);
-        
-        corgiGroup.userData.ears = [earL, earR];
-
-        // Legs
-        const legGeo = new THREE.CylinderGeometry(0.08, 0.06, 0.25, 32);
-        const legPos = [{x:0.18, z:0.2}, {x:-0.18, z:0.2}, {x:0.18, z:-0.2}, {x:-0.18, z:-0.2}];
-        legPos.forEach(p => {
-            const legG = new THREE.Group(); legG.position.set(p.x, 0.28, p.z); corgiBody.add(legG);
-            const l = new THREE.Mesh(legGeo, matBody); l.position.y = -0.1; l.castShadow = true; legG.add(l);
-            const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.05, 32), new THREE.MeshStandardMaterial({color:0x212121}));
-            hoof.position.y = -0.15; l.add(hoof);
-            legs.push(legG);
-        });
-    }
-
-    // 2. 柯基 (Corgi) - Fixed (Ensure visibility of all parts)
+    // 2. 柯基 (Corgi) - Redesigned (Fluffy, Cute, Short Legs)
     function createCorgi() {
         clearPet();
         const traits = corgiGroup.userData.traits || { bodyScale:1, headScale:1, earScale:1 };
         
-        const matOrange = new THREE.MeshStandardMaterial({ color: 0xE69A45, roughness: 0.5 });
-        const matWhite = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.5 });
-        const matBlack = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
+        const matOrange = new THREE.MeshStandardMaterial({ color: 0xF57C00, roughness: 0.6 });
+        const matWhite = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.6 });
+        const matBlack = new THREE.MeshStandardMaterial({ color: 0x111111 });
 
-        // Body - Cylinder (Horizontal)
-        const bodyR = 0.28 * traits.bodyScale;
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(bodyR, bodyR, 0.55, 32), matOrange);
-        body.rotation.x = Math.PI / 2; 
-        body.position.y = 0.35; 
-        body.castShadow = true; 
-        corgiBody.add(body);
+        // Body (Capsule-like using merged spheres for fluffiness)
+        const bodyR = 0.35 * traits.bodyScale;
+        const bodyGroup = new THREE.Group();
+        bodyGroup.position.y = 0.4;
+        corgiBody.add(bodyGroup);
+
+        // Main Body
+        const b1 = new THREE.Mesh(new THREE.SphereGeometry(bodyR, 32, 32), matOrange);
+        b1.scale.set(1, 0.9, 1.2);
+        bodyGroup.add(b1);
         
-        // Chest White Fur
-        const chest = new THREE.Mesh(new THREE.SphereGeometry(bodyR * 0.95, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.5), matWhite);
-        chest.rotation.x = Math.PI / 2; 
-        chest.scale.set(1, 0.6, 1);
-        chest.position.set(0, 0.35, 0.25); // Front of body
-        corgiBody.add(chest);
+        // White Belly/Chest
+        const chest = new THREE.Mesh(new THREE.SphereGeometry(bodyR*0.9, 32, 32), matWhite);
+        chest.position.set(0, -0.05, 0.2);
+        chest.scale.set(0.9, 0.8, 1);
+        bodyGroup.add(chest);
 
-        // Butt - Split
-        const buttR = bodyR * 1.05;
-        const buttL = new THREE.Mesh(new THREE.SphereGeometry(buttR, 32, 32), matOrange);
-        buttL.position.set(0.12, 0.35, -0.25); corgiBody.add(buttL);
-        
-        const buttRight = new THREE.Mesh(new THREE.SphereGeometry(buttR, 32, 32), matOrange);
-        buttRight.position.set(-0.12, 0.35, -0.25); corgiBody.add(buttRight);
+        // Butt (Heart shaped-ish)
+        const buttL = new THREE.Mesh(new THREE.SphereGeometry(bodyR*0.6, 32, 32), matOrange);
+        buttL.position.set(0.12, 0.03, -0.25);
+        bodyGroup.add(buttL);
+        const buttR = new THREE.Mesh(new THREE.SphereGeometry(bodyR*0.6, 32, 32), matOrange);
+        buttR.position.set(-0.12, 0.03, -0.25);
+        bodyGroup.add(buttR);
 
-        // Tail
-        tail = new THREE.Group(); tail.position.set(0, 0.5, -0.4);
-        const tMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.15, 4, 8), matOrange);
-        tMesh.rotation.x = -0.5; tMesh.position.y = 0.05;
-        tail.add(tMesh); corgiBody.add(tail);
+        // Tail (Nub)
+        tail = new THREE.Group(); 
+        tail.position.set(0, 0.4, -0.45);
+        const tMesh = new THREE.Mesh(new THREE.SphereGeometry(0.08), matOrange);
+        tail.add(tMesh);
+        corgiBody.add(tail);
 
-        // Head Group Position (Make sure it's correct relative to body)
-        headGroup.position.set(0, 0.65, 0.35);
-        // Re-ensure headGroup is attached (just in case clearPet didn't work as expected)
-        if (!corgiBody.children.includes(headGroup)) corgiBody.add(headGroup);
+        // Head
+        corgiBody.add(headGroup);
+        headGroup.position.set(0, 0.75, 0.45);
 
-        // Head Mesh
         const headR = 0.32 * traits.headScale;
         const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 32, 32), matOrange);
-        head.castShadow = true; headGroup.add(head);
+        head.castShadow = true; 
+        headGroup.add(head);
 
         // Snout
-        const snout = new THREE.Mesh(new THREE.SphereGeometry(headR * 0.5, 32, 32), matWhite);
-        snout.position.set(0, -0.1, 0.25); 
-        snout.scale.set(1, 0.8, 1.2);
-        headGroup.add(snout);
+        const snoutGeo = new THREE.SphereGeometry(0.14, 32, 32);
+        const snoutM = new THREE.Mesh(snoutGeo, matWhite);
+        snoutM.scale.set(1, 0.7, 1.2);
+        snoutM.position.set(0, -0.12, 0.25);
+        headGroup.add(snoutM);
 
-        // Nose
-        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.06, 32, 32), matBlack);
-        nose.position.set(0, -0.05, 0.42); headGroup.add(nose);
+        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.05), matBlack);
+        nose.position.set(0, -0.05, 0.4);
+        headGroup.add(nose);
 
-        // Eyes
-        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 32), matBlack); 
-        eyeL.position.set(0.12, 0.05, 0.28); // Push out
-        headGroup.add(eyeL);
-        
-        const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 32), matBlack); 
-        eyeR.position.set(-0.12, 0.05, 0.28); // Push out
-        headGroup.add(eyeR);
+        // Ears (Big Triangles)
+        const earGeo = new THREE.ConeGeometry(0.15 * traits.earScale, 0.3 * traits.earScale, 32);
+        const earL = new THREE.Group(); earL.position.set(0.22, 0.20, 0);
+        const elM = new THREE.Mesh(earGeo, matOrange); elM.position.y=0.12;
+        earL.add(elM); 
+        earL.rotation.set(0, 0, -0.4);
+        headGroup.add(earL);
 
-        // Ears
-        const earGeo = new THREE.ConeGeometry(0.1 * traits.earScale, 0.25 * traits.earScale, 32); 
-        const earL = new THREE.Group(); earL.position.set(0.2, 0.25, 0);
-        const earLMesh = new THREE.Mesh(earGeo, matOrange); earLMesh.rotation.set(-0.2, 0, -0.3); earLMesh.position.y=0.12;
-        earL.add(earLMesh); headGroup.add(earL);
-        
-        const earR = new THREE.Group(); earR.position.set(-0.2, 0.25, 0);
-        const earRMesh = new THREE.Mesh(earGeo, matOrange); earRMesh.rotation.set(-0.2, 0, 0.3); earRMesh.position.y=0.12;
-        earR.add(earRMesh); headGroup.add(earR);
-
+        const earR = new THREE.Group(); earR.position.set(-0.22, 0.20, 0);
+        const erM = new THREE.Mesh(earGeo, matOrange); erM.position.y=0.12;
+        earR.add(erM); 
+        earR.rotation.set(0, 0, 0.4);
+        headGroup.add(earR);
         corgiGroup.userData.ears = [earL, earR];
 
-        // Legs
-        const legGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.25, 32);
-        const legPos = [{x:0.15, z:0.15}, {x:-0.15, z:0.15}, {x:0.15, z:-0.15}, {x:-0.15, z:-0.15}];
+        // Eyes
+        const eyeGeo = new THREE.SphereGeometry(0.05, 32, 32);
+        const eyeL = new THREE.Mesh(eyeGeo, matBlack); 
+        eyeL.position.set(0.14, 0.05, 0.29); 
+        headGroup.add(eyeL);
+        const eyeR = new THREE.Mesh(eyeGeo, matBlack); 
+        eyeR.position.set(-0.14, 0.05, 0.29); 
+        headGroup.add(eyeR);
+
+        // Legs (Short & Stubby)
+        const legGeo = new THREE.CylinderGeometry(0.09, 0.07, 0.3, 32);
+        const legPos = [{x:0.2, z:0.25}, {x:-0.2, z:0.25}, {x:0.2, z:-0.25}, {x:-0.2, z:-0.25}];
         legPos.forEach(p => {
-            const legG = new THREE.Group(); legG.position.set(p.x, 0.2, p.z); corgiBody.add(legG);
-            const l = new THREE.Mesh(legGeo, matWhite); l.position.y = -0.1; l.castShadow = true; legG.add(l);
+            const legG = new THREE.Group(); 
+            legG.position.set(p.x, 0.25, p.z); 
+            corgiBody.add(legG);
+            
+            const l = new THREE.Mesh(legGeo, matWhite); 
+            l.position.y = -0.15; 
+            l.castShadow = true; 
+            legG.add(l);
+            
+            // Paws
+            const paw = new THREE.Mesh(new THREE.SphereGeometry(0.08), matWhite);
+            paw.position.set(0, -0.15, 0.05);
+            l.add(paw);
+
             legs.push(legG);
         });
     }
 
-    // 3. 小白兔 (Rabbit)
+    // 3. 小白兔 (Rabbit) - Fixed (Visuals & Structure)
     function createRabbit() {
         clearPet();
         const traits = corgiGroup.userData.traits || { bodyScale:1, headScale:1, earScale:1 };
@@ -1046,55 +1089,74 @@
         const matPink = new THREE.MeshStandardMaterial({ color: 0xF8BBD0, roughness: 0.8 });
         const matBlack = new THREE.MeshStandardMaterial({ color: 0x111111 });
 
-        // Body
-        const body = new THREE.Mesh(new THREE.SphereGeometry(0.4 * traits.bodyScale, 32, 32), matWhite);
-        body.position.y = 0.4; body.scale.set(1, 0.9, 1.1); body.castShadow = true;
+        // Body - Rounder
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.32 * traits.bodyScale, 32, 32), matWhite);
+        body.position.y = 0.38; 
+        body.scale.set(0.95, 0.85, 1.05); 
+        body.castShadow = true;
         corgiBody.add(body);
 
-        // Tail (Fluffy ball)
-        tail = new THREE.Group(); tail.position.set(0, 0.35, -0.45);
-        const tMesh = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), matWhite);
+        // Tail (Tiny fluffy ball)
+        tail = new THREE.Group(); tail.position.set(0, 0.3, -0.42);
+        const tMesh = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 16), matWhite);
         tail.add(tMesh); corgiBody.add(tail);
 
-        // Head
-        const headR = 0.28 * traits.headScale;
-        headGroup.position.set(0, 0.65, 0.35);
+        // Head - Distinctly forward
+        corgiBody.add(headGroup);
+        headGroup.position.set(0, 0.6, 0.35);
+        headGroup.rotation.set(0, 0, 0);
+
+        const headR = 0.25 * traits.headScale;
         const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 32, 32), matWhite);
         head.castShadow = true; headGroup.add(head);
 
-        // Snout
-        const snout = new THREE.Mesh(new THREE.SphereGeometry(headR * 0.35, 16, 16), matWhite);
-        snout.position.set(0, -0.05, 0.22); headGroup.add(snout);
-        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.04), matPink);
-        nose.position.set(0, 0.02, 0.1); snout.add(nose);
+        // Chest fluff
+        const chestFluff = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), matWhite);
+        chestFluff.position.set(0, 0.32, 0.18);
+        corgiBody.add(chestFluff);
 
-        // Ears (Long)
-        const earGeo = new THREE.CylinderGeometry(0.05 * traits.earScale, 0.04 * traits.earScale, 0.4 * traits.earScale, 16);
-        const eL = new THREE.Group(); eL.position.set(0.15, 0.2, 0);
-        const elMesh = new THREE.Mesh(earGeo, matWhite); elMesh.position.y = 0.2; elMesh.rotation.x = -0.2;
+        // Snout
+        const snout = new THREE.Mesh(new THREE.SphereGeometry(headR * 0.4, 16, 16), matWhite);
+        snout.position.set(0, -0.05, 0.2); headGroup.add(snout);
+        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.03), matPink);
+        nose.position.set(0, 0.02, 0.12); snout.add(nose);
+
+        // Ears (Long and upright)
+        const earGeo = new THREE.CylinderGeometry(0.05 * traits.earScale, 0.04 * traits.earScale, 0.45 * traits.earScale, 16);
+        const eL = new THREE.Group(); eL.position.set(0.12, 0.2, 0);
+        const elMesh = new THREE.Mesh(earGeo, matWhite); elMesh.position.y = 0.2; elMesh.rotation.x = -0.1;
         eL.add(elMesh); headGroup.add(eL);
         
-        const eR = new THREE.Group(); eR.position.set(-0.15, 0.2, 0);
-        const erMesh = new THREE.Mesh(earGeo, matWhite); erMesh.position.y = 0.2; erMesh.rotation.x = -0.2;
+        const eR = new THREE.Group(); eR.position.set(-0.12, 0.2, 0);
+        const erMesh = new THREE.Mesh(earGeo, matWhite); erMesh.position.y = 0.2; erMesh.rotation.x = -0.1;
         eR.add(erMesh); headGroup.add(eR);
 
         corgiGroup.userData.ears = [eL, eR];
 
         // Eyes
-        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.03), matBlack); eyeL.position.set(0.1, 0.05, 0.25); headGroup.add(eyeL);
-        const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.03), matBlack); eyeR.position.set(-0.1, 0.05, 0.25); headGroup.add(eyeR);
+        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.03), matBlack); eyeL.position.set(0.1, 0.05, 0.22); headGroup.add(eyeL);
+        const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.03), matBlack); eyeR.position.set(-0.1, 0.05, 0.22); headGroup.add(eyeR);
 
-        // Legs
-        const legGeo = new THREE.CylinderGeometry(0.05, 0.04, 0.2, 16);
+        // Legs - Attached to body, moving with it
+        const legGeo = new THREE.CylinderGeometry(0.05, 0.04, 0.18, 16);
         const legPos = [{x:0.15, z:0.2}, {x:-0.15, z:0.2}, {x:0.15, z:-0.2}, {x:-0.15, z:-0.2}];
         legPos.forEach(p => {
-            const legG = new THREE.Group(); legG.position.set(p.x, 0.15, p.z); corgiBody.add(legG);
-            const l = new THREE.Mesh(legGeo, matWhite); l.position.y = -0.1; l.castShadow = true; legG.add(l);
+            const legG = new THREE.Group(); 
+            legG.position.set(p.x, 0.28, p.z); // Embed deeper into body (Was 0.18)
+            corgiBody.add(legG);
+            
+            const l = new THREE.Mesh(legGeo, matWhite); 
+            l.position.y = -0.16; 
+            l.castShadow = true; 
+            legG.add(l);
+            const paw = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 16), matPink);
+            paw.position.set(0, -0.06, 0.06);
+            l.add(paw);
             legs.push(legG);
         });
     }
 
-    // 4. 小花猫 (Cat) - Revised (Mouth Detail)
+    // 4. 小花猫 (Cat) - Fixed (Legs & Structure)
     function createCat() {
         clearPet();
         const traits = corgiGroup.userData.traits || { bodyScale:1, headScale:1, earScale:1 };
@@ -1105,13 +1167,13 @@
         const matBlack = new THREE.MeshStandardMaterial({ color: 0x111111 });
 
         // Body
-        const body = new THREE.Mesh(new THREE.SphereGeometry(0.4 * traits.bodyScale, 32, 32), matGrey);
-        body.position.y = 0.4; body.scale.set(0.85, 0.9, 1.1); body.castShadow = true;
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.38 * traits.bodyScale, 32, 32), matGrey);
+        body.position.y = 0.42; body.scale.set(0.65, 0.8, 1.25); body.castShadow = true;
         corgiBody.add(body);
         
         // Belly patch
-        const belly = new THREE.Mesh(new THREE.SphereGeometry(0.3 * traits.bodyScale, 32, 32), matWhite);
-        belly.position.set(0, 0.35, 0.05); belly.scale.set(1, 0.8, 1.1);
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(0.28 * traits.bodyScale, 32, 32), matWhite);
+        belly.position.set(0, 0.30, 0.05); belly.scale.set(0.9, 0.6, 1.0);
         corgiBody.add(belly);
 
         // Tail (Long)
@@ -1121,52 +1183,63 @@
         tail.add(tMesh); corgiBody.add(tail);
 
         // Head
-        const headR = 0.28 * traits.headScale;
+        corgiBody.add(headGroup); // Ensure headGroup is added!
+        const headR = 0.24 * traits.headScale;
         headGroup.position.set(0, 0.65, 0.35);
         const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 32, 32), matGrey);
         head.castShadow = true; headGroup.add(head);
 
+        // Chest fluff (white)
+        const chestFluffCat = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), matWhite);
+        chestFluffCat.position.set(0, 0.38, 0.18);
+        corgiBody.add(chestFluffCat);
+
         // Ears (Pointy)
-        const earGeo = new THREE.ConeGeometry(0.08 * traits.earScale, 0.15 * traits.earScale, 4);
+        const earGeo = new THREE.ConeGeometry(0.07 * traits.earScale, 0.18 * traits.earScale, 4);
         const eL = new THREE.Mesh(earGeo, matGrey); eL.position.set(0.15, 0.25, 0); eL.rotation.set(0, 0, -0.3); headGroup.add(eL);
         const eR = new THREE.Mesh(earGeo, matGrey); eR.position.set(-0.15, 0.25, 0); eR.rotation.set(0, 0, 0.3); headGroup.add(eR);
-        
         corgiGroup.userData.ears = [eL, eR];
 
         // Eyes (Vertical Slit)
         const eyeGeo = new THREE.BoxGeometry(0.02, 0.08, 0.02);
-        const eyeL = new THREE.Mesh(eyeGeo, matBlack); eyeL.position.set(0.1, 0.05, 0.27); headGroup.add(eyeL);
-        const eyeR = new THREE.Mesh(eyeGeo, matBlack); eyeR.position.set(-0.1, 0.05, 0.27); headGroup.add(eyeR);
+        const eyeL = new THREE.Mesh(eyeGeo, matBlack); eyeL.position.set(0.1, 0.05, 0.24); headGroup.add(eyeL);
+        const eyeR = new THREE.Mesh(eyeGeo, matBlack); eyeR.position.set(-0.1, 0.05, 0.24); headGroup.add(eyeR);
 
         // Nose
-        const nose = new THREE.Mesh(new THREE.Triangle, matPink); // Simplified
         const noseMesh = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.02, 4), matPink);
         noseMesh.rotation.x = Math.PI/2; noseMesh.rotation.y = Math.PI/4;
-        noseMesh.position.set(0, -0.02, 0.28); headGroup.add(noseMesh);
+        noseMesh.position.set(0, -0.02, 0.24); headGroup.add(noseMesh);
 
         // Mouth (8-petal / 'w' shape)
         const mouthGroup = new THREE.Group();
-        mouthGroup.position.set(0, -0.05, 0.27);
+        mouthGroup.position.set(0, -0.05, 0.24);
         headGroup.add(mouthGroup);
-        
-        const mouthCurve = new THREE.TorusGeometry(0.03, 0.006, 8, 16, Math.PI); // Thicker
+        const mouthCurve = new THREE.TorusGeometry(0.03, 0.006, 8, 16, Math.PI);
         const mL = new THREE.Mesh(mouthCurve, matBlack);
         mL.position.set(0.03, 0, 0); mL.rotation.z = Math.PI;
         mouthGroup.add(mL);
-        
         const mR = new THREE.Mesh(mouthCurve, matBlack);
         mR.position.set(-0.03, 0, 0); mR.rotation.z = Math.PI;
         mouthGroup.add(mR);
 
         // Legs
-        const legGeo = new THREE.CylinderGeometry(0.05, 0.04, 0.25, 16);
+        const legGeo = new THREE.CylinderGeometry(0.04, 0.035, 0.28, 16);
         const legPos = [{x:0.15, z:0.2}, {x:-0.15, z:0.2}, {x:0.15, z:-0.2}, {x:-0.15, z:-0.2}];
         legPos.forEach(p => {
-            const legG = new THREE.Group(); legG.position.set(p.x, 0.15, p.z); corgiBody.add(legG);
-            const l = new THREE.Mesh(legGeo, matWhite); l.position.y = -0.1; l.castShadow = true; legG.add(l);
+            const legG = new THREE.Group(); legG.position.set(p.x, 0.2, p.z); // Raised to body height
+            corgiBody.add(legG); // Ensure added to body
+            const l = new THREE.Mesh(legGeo, matWhite); l.position.y = -0.1; l.castShadow = true; 
+            legG.add(l);
+            const paw = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 16), matPink);
+            paw.position.set(0, -0.10, 0.06);
+            l.add(paw);
             legs.push(legG);
         });
     }
+
+    window.createCorgi = createCorgi;
+    window.createRabbit = createRabbit;
+    window.createCat = createCat;
 
     // --- 宠物状态系统 ---
     const petStatus = {
@@ -1182,6 +1255,8 @@
     }
 
     window.interact = function(type) {
+        lastOwnerInteractionTime = Date.now() * 0.001;
+        didWanderAfterOwnerIdle = false;
         if (currentState !== STATE.IDLE) return; // 忙碌中
         currentState = STATE.BUSY; // 锁定状态
 
@@ -1222,10 +1297,7 @@
             if(tail) tail.rotation.set(0,0,0);
 
             if (type === 'feed') {
-                if (currentPet === 'buffalo') {
-                    // 水牛: 大口吃草
-                    headGroup.rotation.x = Math.sin(t * 10) * 0.5 + 0.4; 
-                } else if (currentPet === 'corgi') {
+                if (currentPet === 'corgi') {
                     // 柯基: 开心跳跃
                     corgiBody.position.y = Math.abs(Math.sin(t * 15)) * 0.2; 
                     corgiBody.rotation.z = Math.sin(t * 20) * 0.1;
@@ -1239,13 +1311,9 @@
                     corgiBody.position.y = -0.1; 
                 }
             } else if (type === 'groom') {
-                if (currentPet === 'buffalo') {
-                    // 水牛: 享受摇摆
-                    corgiBody.rotation.z = Math.sin(t * 4) * 0.15;
-                    headGroup.rotation.z = -Math.sin(t * 4) * 0.2;
-                } else if (currentPet === 'corgi') {
-                    // 柯基: 屁股大扭
-                    corgiBody.rotation.y = Math.sin(t * 12) * 0.3; 
+                if (currentPet === 'corgi') {
+                    // 柯基: 屁股左右摆动 (No yaw spin)
+                    corgiBody.rotation.z = Math.sin(t * 12) * 0.12; 
                     if(tail) tail.rotation.z = Math.sin(t * 20) * 1.0;
                 } else if (currentPet === 'rabbit') {
                     // 兔子: 舒服颤抖
@@ -1258,14 +1326,9 @@
                     corgiBody.position.y = 0.15;
                 }
             } else if (type === 'play') {
-                if (currentPet === 'buffalo') {
-                    // 水牛: 冲撞
-                    const phase = t * 8;
-                    corgiBody.position.z = Math.sin(phase) * 0.6; 
-                    corgiBody.rotation.x = -Math.abs(Math.sin(phase)) * 0.3; 
-                } else if (currentPet === 'corgi') {
-                    // 柯基: 疯狂旋转 (Zoomies)
-                    corgiBody.rotation.y = t * 15;
+                if (currentPet === 'corgi') {
+                    // 柯基: 欢快跳跃 (No spinning)
+                    corgiBody.rotation.z = Math.sin(t * 15) * 0.1; // Wiggle
                     corgiBody.position.y = Math.abs(Math.sin(t * 15)) * 0.15;
                 } else if (currentPet === 'rabbit') {
                     // 兔子: 超级大跳
@@ -1306,6 +1369,19 @@
         updateStatusUI();
     }, 5000);
 
+
+
+    // --- 宠物自主行为系统 ---
+    let lastBehaviorTime = 0;
+    let behaviorTimer = null;
+    let runLookAtCooldown = 0;
+    let runStateStart = 0;
+    let lastRunDist = Infinity;
+    let lastDistDecreaseTime = 0;
+    let lastOwnerInteractionTime = 0;
+    const OWNER_IDLE_THRESHOLD = 60; // seconds
+    let didWanderAfterOwnerIdle = false;
+
     // --- 切换与初始化 ---
     window.selectPet = function(type) {
         document.querySelectorAll('.pet-option').forEach(el => el.classList.remove('active'));
@@ -1326,13 +1402,12 @@
         }
     }
 
-    // 默认启动水牛 (via restorePet or selectPet in login)
-    // createBuffalo(); // Removed, handled by login logic
-
-
-    // --- 宠物自主行为系统 ---
-    let lastBehaviorTime = 0;
-    let behaviorTimer = null;
+        // Default startup pet
+    selectPet(currentPet);
+    if(window.pendingPetConfig){
+        restorePet(window.pendingPetConfig);
+        window.pendingPetConfig = null;
+    }
     
     function showThought(text) {
         const bubble = document.getElementById('pet-thoughts');
@@ -1346,39 +1421,84 @@
         }, 3000);
     }
 
+    // Helper to check position validity (Avoid Ponds)
+    function isValidPos(pos) {
+        for(let p of ponds) {
+            if(pos.distanceTo(p.position) < p.radius + 1.5) return false;
+        }
+        return true;
+    }
+
     function updatePetBehavior(time) {
         // 只有在 IDLE 状态下才触发自主行为
         if (currentState !== STATE.IDLE) return;
+        const ownerIdle = (time - lastOwnerInteractionTime) > OWNER_IDLE_THRESHOLD;
 
-        // 每 5-10 秒触发一次行为
-        if (time - lastBehaviorTime > 5 + Math.random() * 5) {
+        if (time - lastBehaviorTime > 100 + Math.random() * 125) {
             lastBehaviorTime = time;
             const texts = PET_BEHAVIOR_TEXT[currentPet];
-            const personality = PET_PERSONALITY[currentPet];
+            let personality = PET_PERSONALITY[currentPet];
+            if(!personality) personality = { type:'energetic', sniffChance:0.5, probeChance:0.5 };
             const rand = Math.random();
+            if (!ownerIdle || Math.random() < 0.95) {
+                if (Math.random() < 0.6) {
+                    const camPos = camera.position.clone();
+                    camPos.y = corgiGroup.position.y;
+                    corgiGroup.lookAt(camPos);
+                    headGroup.rotation.z = (Math.random()<0.5?1:-1) * 0.25;
+                    setTimeout(()=> headGroup.rotation.z = 0, 1200);
+                    showThought("(看着你...)");
+                } else {
+                    // 自我照料 (原地)
+                    if (currentPet === 'cat') {
+                        showThought("(舔爪子...)");
+                        headGroup.rotation.x = 0.25;
+                        setTimeout(()=> headGroup.rotation.x = 0, 1500);
+                    } else if (currentPet === 'rabbit') {
+                        showThought("(抖动鼻子...)");
+                        let c=0; const s=setInterval(()=>{ headGroup.position.y = 0.65 + Math.sin(c)*0.02; c+=0.5; if(c>10){clearInterval(s); headGroup.position.y=0.65;} }, 50);
+                    } else {
+                        showThought("(梳理毛发...)");
+                        if(tail) { let c=0; const w=setInterval(()=>{ tail.rotation.z = Math.sin(c)*0.8; c+=0.3; if(c>Math.PI*2){ clearInterval(w); tail.rotation.z=0; }}, 50); }
+                    }
+                }
+                return;
+            }
+
+            // Helper to check position validity (Avoid Ponds)
+            const isValidPos = (pos) => {
+                for(let p of ponds) {
+                    if(pos.distanceTo(p.position) < p.radius + 1.5) return false;
+                }
+                return true;
+            };
 
             // --- 1. 与用户互动 (闻嗅/试探) ---
             const distToCam = dogPos.distanceTo(camera.position);
             // 如果距离相机较远且触发概率，则靠近
-            if (distToCam > 4.0 && distToCam < 15.0 && Math.random() < personality.sniffChance) {
+            if (ownerIdle && !didWanderAfterOwnerIdle && distToCam > 4.0 && distToCam < 15.0 && Math.random() < personality.sniffChance) {
                 const camPosXZ = new THREE.Vector3(camera.position.x, 0, camera.position.z);
                 const dir = camPosXZ.clone().sub(dogPos).normalize();
                 const stopDist = 3.5; // 停在相机前
                 
-                targetPos.copy(camPosXZ.sub(dir.multiplyScalar(stopDist)));
-                currentState = STATE.RUN;
-                
-                const approachTexts = ["(好奇地走过来...)", "(想要靠近你...)", "(嗅嗅你的味道...)"];
-                showThought(approachTexts[Math.floor(Math.random()*approachTexts.length)]);
-                return;
+                const target = camPosXZ.sub(dir.multiplyScalar(stopDist));
+                if(isValidPos(target)) {
+                    targetPos.copy(target);
+                    currentState = STATE.RUN;
+                    
+                    const approachTexts = ["(好奇地走过来...)", "(想要靠近你...)", "(嗅嗅你的味道...)"];
+                    showThought(approachTexts[Math.floor(Math.random()*approachTexts.length)]);
+                    return;
+                }
             }
 
             // 如果已经在相机附近 (Sniff/Probe Animation)
             if (distToCam <= 4.5 && Math.random() < personality.probeChance) {
                  // Face camera
                  const camPos = camera.position.clone();
-                 camPos.y = corgiGroup.position.y;
-                 corgiGroup.lookAt(camPos);
+                 const dx = camPos.x - corgiGroup.position.x;
+                 const dz = camPos.z - corgiGroup.position.z;
+                 corgiGroup.rotation.y = Math.atan2(dx, dz);
 
                  if (currentPet === 'corgi') {
                      showThought("(歪头杀~)");
@@ -1390,10 +1510,6 @@
                      corgiBody.rotation.x = -Math.PI/6;
                      corgiBody.position.y = -0.1;
                      setTimeout(()=>{ corgiBody.rotation.x=0; corgiBody.position.y=0; }, 2000);
-                 } else if (currentPet === 'buffalo') {
-                     showThought("哞? (你干嘛呢)");
-                     headGroup.rotation.x = 0.2;
-                     setTimeout(()=>headGroup.rotation.x=0, 1000);
                  } else {
                      showThought("(动动鼻子嗅嗅)");
                      // Rabbit sniff
@@ -1404,23 +1520,35 @@
             }
 
             // --- 1.5 Environmental Attraction (Ponds, Mushrooms, Bushes, Flowers) ---
-            const attractions = [...flowers, ...bushes, ...ponds, ...mushrooms];
-            if (attractions.length > 0 && Math.random() < 0.3) {
-                 const target = attractions[Math.floor(Math.random() * attractions.length)];
-                 if(target.position.distanceTo(dogPos) < 25) {
-                     targetPos.copy(target.position);
-                     // Stop slightly before target (2.0 units)
-                     const dir = dogPos.clone().sub(target.position).normalize();
-                     targetPos.add(dir.multiplyScalar(2.0)); 
-                     
+            const attractions = [...flowerInstances, ...bushes, ...ponds, ...mushrooms, ...stones];
+            // Filter attractions within 5m
+            const nearby = attractions.filter(a => a.position.distanceTo(dogPos) < 5.0);
+            
+            if (ownerIdle && !didWanderAfterOwnerIdle && nearby.length > 0 && Math.random() < 0.03) {
+                 const target = nearby[Math.floor(Math.random() * nearby.length)];
+                 
+                 // Calculate safe stopping point
+                 const dir = dogPos.clone().sub(target.position).normalize();
+                 // If target is pond, stop further away
+                 let stopDist = 0.5;
+                 // Check if target is in 'ponds' array (by reference or property)
+                 // We constructed attractions array, so we can't easily check type.
+                 // But we can check if it has 'radius'.
+                 if(target.radius && target.radius > 3) stopDist = target.radius + 1.0; // Pond
+
+                 const dest = target.position.clone().add(dir.multiplyScalar(stopDist));
+                 
+                 if(isValidPos(dest)) {
+                     targetPos.copy(dest);
                      currentState = STATE.RUN;
+                     didWanderAfterOwnerIdle = true;
                      showThought("(被什么吸引了...)");
                      return;
                  }
             }
 
             // --- 2. 意图表达 (Intention) ---
-            if (Math.random() < 0.35) {
+            if (ownerIdle && !didWanderAfterOwnerIdle && Math.random() < 0.18) {
                 const intentions = [
                     { text: "想去那边看看...", action: "wander" },
                     { text: "肚子有点饿了...", action: "food" },
@@ -1436,16 +1564,40 @@
                 showThought(intent.text);
                 
                 if(intent.action === "wander" || intent.action === "tree") {
+                    let targetTree = null;
                     if(intent.action === "tree" && trees.length > 0) {
-                         const t = trees[Math.floor(Math.random()*trees.length)];
-                         const dir = dogPos.clone().sub(t.position).normalize();
-                         targetPos.copy(t.position.clone().add(dir.multiplyScalar(2.0)));
-                    } else {
-                         const angle = Math.random() * Math.PI * 2;
-                         const dist = 1 + Math.random() * 2; // Limit to 3m radius (1-3m)
-                         targetPos.set(Math.cos(angle)*dist, 0, Math.sin(angle)*dist);
+                        // Filter trees within 5m (slightly larger range for trees)
+                        const nearbyTrees = trees.filter(t => t.position.distanceTo(dogPos) < 5.0);
+                        if (nearbyTrees.length > 0) {
+                            targetTree = nearbyTrees[Math.floor(Math.random() * nearbyTrees.length)];
+                        }
                     }
-                    currentState = STATE.RUN;
+
+                    if(targetTree) {
+                         const dir = dogPos.clone().sub(targetTree.position).normalize();
+                         const dest = targetTree.position.clone().add(dir.multiplyScalar(2.0));
+                         if(isValidPos(dest)) {
+                             targetPos.copy(dest);
+                             currentState = STATE.RUN;
+                             didWanderAfterOwnerIdle = true;
+                         }
+                    } else {
+                         // Fallback to short wander
+                         // Try up to 3 times to find valid pos
+                         for(let k=0; k<3; k++) {
+                             const angle = Math.random() * Math.PI * 2;
+                             const dist = 0.3 + Math.random() * 1.0;
+                             let tx = dogPos.x + Math.cos(angle)*dist;
+                             let tz = dogPos.z + Math.sin(angle)*dist;
+                             const dest = new THREE.Vector3(tx, 0, tz);
+                             if(isValidPos(dest)) {
+                                 targetPos.copy(dest);
+                                 currentState = STATE.RUN;
+                                 didWanderAfterOwnerIdle = true;
+                                 break;
+                             }
+                         }
+                    }
                 } else if (intent.action === "play_beg") {
                      // Jump
                      corgiBody.position.y = 0.3;
@@ -1455,38 +1607,36 @@
             }
 
 
-            // --- 3. 环境交互检测 (树木, 花朵, 灌木) ---
+            // --- 3. 环境交互检测 (树木, 花朵, 灌木, 石头, 蘑菇) ---
             
             // A. Trees (Climb/Rub)
-            let nearbyTree = trees.find(t => dogPos.distanceTo(t.position) < 2.5);
-            if (nearbyTree && Math.random() < 0.4) {
+            let nearbyTree = trees.find(t => dogPos.distanceTo(t.position) < 3.5);
+            if (nearbyTree && Math.random() < 0.03) {
                 const treeDir = nearbyTree.position.clone().sub(dogPos).normalize();
                 corgiGroup.rotation.y = Math.atan2(treeDir.x, treeDir.z);
                 
-                if(currentPet === 'buffalo') {
-                    showThought("(蹭蹭树干...)");
-                    let count = 0;
-                    const rubAnim = setInterval(() => {
-                        corgiBody.rotation.z = Math.sin(count) * 0.1;
-                        count += 0.2;
-                        if(count > Math.PI*4) { clearInterval(rubAnim); corgiBody.rotation.z = 0; }
-                    }, 30);
-                } else if(currentPet === 'corgi') {
+                if(currentPet === 'corgi') {
                     showThought("(闻闻树根...)");
                     corgiBody.rotation.x = 0.2;
                     setTimeout(()=>corgiBody.rotation.x=0, 1000);
                 } else if(currentPet === 'cat') {
-                    showThought("(磨爪子...)"); // 攀爬意向
+                    showThought("(想要爬树...)"); 
+                    // Climb animation (Vertical jump & hold)
                     let count = 0;
-                    const scratchAnim = setInterval(() => {
-                        corgiBody.position.y = Math.abs(Math.sin(count)) * 0.2; // Jump up a bit
-                        corgiBody.rotation.x = -0.5; // Look up
-                        count += 0.3;
-                        if(count > Math.PI*6) { clearInterval(scratchAnim); corgiBody.position.y = 0; corgiBody.rotation.x = 0; }
+                    const climbAnim = setInterval(() => {
+                        if(count < 15) corgiBody.position.y += 0.08; // Up
+                        else if(count < 40) corgiBody.rotation.x = -0.6; // Hold & Look up
+                        else corgiBody.position.y -= 0.08; // Down
+                        
+                        count++;
+                        if(count > 55 || corgiBody.position.y < 0) { 
+                            clearInterval(climbAnim); 
+                            corgiBody.position.y = 0; 
+                            corgiBody.rotation.x = 0; 
+                        }
                     }, 30);
                 } else {
                      showThought("(绕着树跑...)");
-                     // Rabbit circle? Just hop in place
                      let count = 0;
                      const hop = setInterval(() => {
                         corgiBody.position.y = Math.abs(Math.sin(count)) * 0.3;
@@ -1498,30 +1648,29 @@
             }
 
             // B. Flowers (Sniff)
-            let nearbyFlower = flowers.find(f => dogPos.distanceTo(f.position) < 1.5);
-            if (nearbyFlower && Math.random() < 0.5) {
+            let nearbyFlower = flowerInstances.find(f => dogPos.distanceTo(f.position) < 2.5);
+            if (nearbyFlower && Math.random() < 0.04) {
                 const dir = nearbyFlower.position.clone().sub(dogPos).normalize();
                 corgiGroup.rotation.y = Math.atan2(dir.x, dir.z);
                 showThought("(闻闻花香...)");
                 
-                // Sniff animation (Head down, nose twitch)
-                corgiBody.rotation.x = 0.3; // Lean forward/down
+                // Sniff animation
+                corgiBody.rotation.x = 0.3; 
                 headGroup.rotation.x = 0.2;
                 
                 let count = 0;
                 const sniff = setInterval(() => {
-                    headGroup.position.z = 0.35 + Math.sin(count*20)*0.02; // Twitch
+                    headGroup.position.z = 0.35 + Math.sin(count*20)*0.02; 
                     count += 0.1;
                     if(count > 2) { 
                         clearInterval(sniff); 
                         corgiBody.rotation.x = 0; 
                         headGroup.rotation.x = 0; 
-                        headGroup.position.z = 0.35; // Reset head pos (approx)
+                        headGroup.position.z = 0.35; 
                         
-                        // Happy reaction
                         showThought("好香啊~");
                         if(currentPet === 'rabbit' || currentPet === 'corgi') {
-                            corgiBody.position.y = 0.2; // Jump for joy
+                            corgiBody.position.y = 0.2; 
                             setTimeout(()=>corgiBody.position.y=0, 200);
                         }
                     }
@@ -1529,26 +1678,41 @@
                 return;
             }
 
-            // C. Bushes (Bounce/Hide)
-            let nearbyBush = bushes.find(b => dogPos.distanceTo(b.position) < 2.0);
-            if (nearbyBush && Math.random() < 0.5) {
+            // C. Bushes (Bounce/Hide/Find Berries)
+            let nearbyBush = bushes.find(b => dogPos.distanceTo(b.position) < 2.5);
+            if (nearbyBush && Math.random() < 0.04) {
                 const dir = nearbyBush.position.clone().sub(dogPos).normalize();
                 corgiGroup.rotation.y = Math.atan2(dir.x, dir.z);
                 
-                if (currentPet === 'rabbit' || currentPet === 'cat') {
+                const randAction = Math.random();
+                
+                if (randAction < 0.3) { // 30% Find Berries
+                     showThought("(发现野果！)");
+                     corgiBody.rotation.x = 0.35; 
+                     headGroup.rotation.x = 0.25;
+                     if(propFood) propFood.visible = true;
+                     
+                     setTimeout(() => { showThought("酸酸甜甜~"); }, 1000);
+                     setTimeout(() => {
+                        corgiBody.rotation.x = 0;
+                        headGroup.rotation.x = 0;
+                        if(propFood) propFood.visible = false;
+                        petStatus.health = Math.min(100, petStatus.health + 2);
+                        updateStatusUI();
+                     }, 2500);
+                     
+                } else if (currentPet === 'rabbit' || currentPet === 'cat') {
                     showThought("(钻进灌木丛...)");
-                    // Hide animation
-                    corgiBody.scale.setScalar(0.5); // Shrink implies hiding
+                    corgiBody.scale.setScalar(0.5); 
                     corgiBody.position.y = -0.2;
                     setTimeout(() => {
                         showThought("(突然跳出来！)");
                         corgiBody.scale.setScalar(1);
-                        corgiBody.position.y = 0.5; // Pop up
+                        corgiBody.position.y = 0.5; 
                         setTimeout(()=>corgiBody.position.y=0, 300);
                     }, 2000);
                 } else {
                     showThought("(弹跳灌木丛！)");
-                    // Bounce on it
                     let count = 0;
                     const bounce = setInterval(() => {
                         corgiBody.position.y = Math.abs(Math.sin(count)) * 0.4;
@@ -1559,9 +1723,51 @@
                 return;
             }
 
+            // D. Mushrooms (Find Food)
+            let nearbyMush = mushrooms.find(m => dogPos.distanceTo(m.position) < 2.0);
+            if (nearbyMush && Math.random() < 0.04) {
+                const dir = nearbyMush.position.clone().sub(dogPos).normalize();
+                corgiGroup.rotation.y = Math.atan2(dir.x, dir.z);
+                showThought("(发现小蘑菇！)");
+                
+                // Eating animation
+                corgiBody.rotation.x = 0.35; 
+                headGroup.rotation.x = 0.25;
+                if(propFood) propFood.visible = true;
+
+                setTimeout(() => {
+                    showThought("吧唧吧唧...");
+                }, 1000);
+
+                setTimeout(() => {
+                    corgiBody.rotation.x = 0;
+                    headGroup.rotation.x = 0;
+                    if(propFood) propFood.visible = false;
+                    showThought("味道真不错~");
+                    petStatus.health = Math.min(100, petStatus.health + 3);
+                    updateStatusUI();
+                }, 3000);
+                return;
+            }
+
+            // E. Stones (Jump)
+            let nearbyStone = stones.find(s => dogPos.distanceTo(s.position) < 2.0);
+            if (nearbyStone && Math.random() < 0.02) {
+                const dir = nearbyStone.position.clone().sub(dogPos).normalize();
+                corgiGroup.rotation.y = Math.atan2(dir.x, dir.z);
+                let count = 0;
+                const jump = setInterval(() => {
+                    corgiBody.position.y = Math.abs(Math.sin(count)) * 0.35;
+                    count += 0.25;
+                    if(count > Math.PI*4) { clearInterval(jump); corgiBody.position.y = 0; }
+                }, 30);
+                showThought("(跳上石头！)");
+                return;
+            }
+
             // --- 2. 随机动作 (Sit/Beg, Idle, Wander) ---
 
-            if (rand < 0.15) {
+            if (rand < 0.03) {
                 // ** Beg Pose (Sit with front legs up) **
                 showThought("(坐下求抱抱...)");
                 
@@ -1572,27 +1778,39 @@
                 corgiBody.rotation.x = -Math.PI / 4; // Tilt back 45 deg
                 corgiBody.position.y = 0.1;
                 
-                // Move front legs? (If accessible via group)
-                // Simplified: The tilt does most of the work.
-                if(currentPet === 'corgi' || currentPet === 'cat') {
-                    // Wiggle front paws?
-                }
-
                 setTimeout(() => {
                     corgiBody.rotation.x = 0;
                     corgiBody.position.y = startY;
                 }, duration);
                 
-            } else if (rand < 0.5) {
-                // Wander
-                const angle = Math.random() * Math.PI * 2;
-                const dist = 1 + Math.random() * 2; 
-                const tx = Math.cos(angle) * dist;
-                const tz = Math.sin(angle) * dist;
-                
-                targetPos.set(tx, 0, tz);
-                currentState = STATE.RUN;
-                showThought(texts.move);
+            } else if (ownerIdle && !didWanderAfterOwnerIdle && rand < 0.0067) {
+                // Wander (Relative to current position, short range)
+                for(let k=0; k<3; k++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = 0.3 + Math.random() * 1.0;
+                    
+                    let tx = dogPos.x + Math.cos(angle) * dist;
+                    let tz = dogPos.z + Math.sin(angle) * dist;
+                    
+                    // Clamp to safe area
+                    if(tx > 30) tx = 30; if(tx < -30) tx = -30;
+                    if(tz > 30) tz = 30; if(tz < -30) tz = -30;
+                    
+                    const dest = new THREE.Vector3(tx, 0, tz);
+                    // Check pond
+                    let inPond = false;
+                    for(let p of ponds) {
+                        if(dest.distanceTo(p.position) < p.radius + 1.5) { inPond = true; break; }
+                    }
+                    
+                    if(!inPond) {
+                        targetPos.copy(dest);
+                        currentState = STATE.RUN;
+                        didWanderAfterOwnerIdle = true;
+                        showThought(texts.move);
+                        break;
+                    }
+                }
 
             } else {
                 // Idle / Look at user
@@ -1600,6 +1818,8 @@
                     const camPos = camera.position.clone();
                     camPos.y = corgiGroup.position.y;
                     corgiGroup.lookAt(camPos);
+                    headGroup.rotation.z = (Math.random()<0.5?1:-1) * 0.25;
+                    setTimeout(()=> headGroup.rotation.z = 0, 1200);
                     showThought("(看着你...)");
                 } else {
                     showThought(texts.idle[Math.floor(Math.random() * texts.idle.length)]);
@@ -1635,7 +1855,15 @@
         // 2. 点击地面移动 (仅当没点到宠物时)
         const hits = raycaster.intersectObject(ground);
         if(hits.length > 0) {
-            const p = hits[0].point;
+            let p = hits[0].point.clone();
+            if(p.length() > WORLD_RADIUS - 1) { p.normalize().multiplyScalar(WORLD_RADIUS - 1); }
+            for(let pond of ponds){
+                const d = p.distanceTo(pond.position);
+                if(d < pond.radius + 0.8){
+                    const dir = p.clone().sub(pond.position).normalize();
+                    p = pond.position.clone().add(dir.multiplyScalar(pond.radius + 1.2));
+                }
+            }
             targetPos.copy(p);
             targetRing.position.set(p.x, 0.05, p.z);
             targetRing.visible = true; targetRing.scale.set(0,0,0);
@@ -1644,6 +1872,8 @@
             currentState = STATE.RUN;
             // 重置自主行为计时，避免移动中触发
             lastBehaviorTime = Date.now() * 0.001;
+            lastOwnerInteractionTime = lastBehaviorTime;
+            didWanderAfterOwnerIdle = false;
         }
     });
 
@@ -1663,8 +1893,8 @@
         fBoneL.position.x = -0.15; propFood.add(fBoneL);
         const fBoneR = new THREE.Mesh(new THREE.SphereGeometry(0.06), new THREE.MeshStandardMaterial({color: 0xFFCCBC}));
         fBoneR.position.x = 0.15; propFood.add(fBoneR);
-        propFood.visible = false; propFood.position.set(0.6, 0.2, 0.5);
-        propGroup.add(propFood);
+        propFood.visible = false; 
+        // propFood will be attached to headGroup in attachPropsToPet
 
         // Comb
         propComb = new THREE.Group();
@@ -1675,110 +1905,80 @@
             t.position.set(-0.1 + i*0.04, -0.08, 0);
             propComb.add(t);
         }
-        propComb.visible = false; propComb.position.set(0.5, 0.5, 0);
-        propGroup.add(propComb);
+        propComb.visible = false;
+        // propComb will be attached to corgiBody in attachPropsToPet
 
         // Toy (Ball)
         propToy = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), new THREE.MeshStandardMaterial({color: 0xFDD835}));
-        propToy.visible = false; propToy.position.set(0, 0.15, 0.8);
-        propGroup.add(propToy);
+        propToy.visible = false;
+        // propToy will be attached to headGroup in attachPropsToPet
     }
     createProps();
 
-    // --- 环境生成 (Refined for Reference Image) ---
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ color: 0xAED581, roughness: 1, flatShading: true })); // Pastel Green
+    // --- 环境生成 (Refined for Reference Image & User Requests) ---
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0xAED581, roughness: 1, flatShading: true })); 
     ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 
     const trees = []; 
     const bushes = [];
-    const flowers = [];
+    var flowerInstances = [];
+    var flowerStemMesh, flowerPetalMesh, flowerCenterMesh;
     const ponds = []; 
     const mushrooms = []; 
+    
+    // Helper to attach props after pet rebuild
+    function attachPropsToPet() {
+        if(!headGroup || !corgiBody) return;
+        
+        // Detach from previous parent if any
+        if(propFood.parent) propFood.parent.remove(propFood);
+        if(propComb.parent) propComb.parent.remove(propComb);
+        if(propToy.parent) propToy.parent.remove(propToy);
 
+        // Attach Food (Mouth) & Toy (Head Top) to Head
+        headGroup.add(propFood);
+        headGroup.add(propToy);
+        
+        // Attach Comb (Body) to Body
+        corgiBody.add(propComb);
+
+        // Set Positions based on Pet Type
+        if(currentPet === 'corgi') {
+            propFood.position.set(0, -0.2, 0.5);
+            propToy.position.set(0, 0.45, 0);
+            propComb.position.set(0, 0.5, 0);
+        } else if(currentPet === 'rabbit') {
+            propFood.position.set(0, -0.1, 0.3);
+            propToy.position.set(0, 0.5, 0); // Between ears
+            propComb.position.set(0, 0.4, 0);
+        } else if(currentPet === 'cat') {
+            propFood.position.set(0, -0.15, 0.35);
+            propToy.position.set(0, 0.4, 0);
+            propComb.position.set(0, 0.45, 0);
+        }
+        
+        // Reset visibility (controlled by interact)
+        propFood.visible = false;
+        propComb.visible = false;
+        propToy.visible = false;
+    }
+
+    var stones = [];
+var maxTrunkTop = 2.5;
     function createNature() {
         const treeMat = new THREE.MeshStandardMaterial({color: 0x795548, flatShading:true});
-        const leafMat = new THREE.MeshStandardMaterial({color: 0x81C784, flatShading:true}); // Lighter green
-        const leafMat2 = new THREE.MeshStandardMaterial({color: 0x66BB6A, flatShading:true});
+        const leafMat = new THREE.MeshStandardMaterial({color: 0xA5D6A7, flatShading: true});
+        const leafMat2 = new THREE.MeshStandardMaterial({color: 0x9CCC65, flatShading: true});
         const bushMat = new THREE.MeshStandardMaterial({color: 0x7CB342, flatShading:true});
         const pondMat = new THREE.MeshStandardMaterial({color: 0x29B6F6, roughness: 0.1, metalness: 0.1, opacity: 0.8, transparent: true});
         const mushStemMat = new THREE.MeshStandardMaterial({color: 0xFFE0B2});
         const mushCapMat = new THREE.MeshStandardMaterial({color: 0xE57373});
 
-        // 1. Trees (Stacked Rounded Polyhedra)
-        const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.5, 6);
-        const crownGeo = new THREE.IcosahedronGeometry(0.8, 1); 
-        
-        for(let i=0; i<60; i++) { 
-            const x=(Math.random()-0.5)*160, z=(Math.random()-0.5)*160;
-            if(Math.abs(x)<5 && Math.abs(z)<5) continue;
-            
-            const tree = new THREE.Group();
-            // Trunk
-            const trunk = new THREE.Mesh(trunkGeo, treeMat); 
-            trunk.position.y=0.75; 
-            tree.add(trunk);
-            
-            // Crown (Cluster)
-            const crown = new THREE.Group();
-            crown.position.y = 1.8;
-            
-            const top = new THREE.Mesh(crownGeo, leafMat);
-            crown.add(top);
-            
-            const pos = [
-                {x:0.6, y:-0.3, z:0}, {x:-0.6, y:-0.3, z:0},
-                {x:0, y:-0.3, z:0.6}, {x:0, y:-0.3, z:-0.6}
-            ];
-            pos.forEach(p => {
-                const sub = new THREE.Mesh(crownGeo, Math.random()>0.5?leafMat:leafMat2);
-                sub.position.set(p.x, p.y, p.z);
-                sub.scale.setScalar(0.8);
-                crown.add(sub);
-            });
-
-            tree.add(crown);
-            tree.scale.setScalar(1 + Math.random()*0.6);
-            tree.position.set(x,0,z);
-            scene.add(tree);
-            trees.push({ position: new THREE.Vector3(x, 0, z), radius: 1.5 });
-        }
-
-        // 2. Bushes (Small Clusters of Spheres)
-        const bushPartGeo = new THREE.SphereGeometry(0.3, 8, 8);
-        for(let i=0; i<60; i++) {
-            const x=(Math.random()-0.5)*120, z=(Math.random()-0.5)*120;
-            if(Math.abs(x)<5 && Math.abs(z)<5) continue;
-
-            const bush = new THREE.Group();
-            const count = 6 + Math.random() * 4;
-            for(let j=0; j<count; j++) {
-                const p = new THREE.Mesh(bushPartGeo, bushMat);
-                p.position.set((Math.random()-0.5)*0.6, Math.random()*0.4, (Math.random()-0.5)*0.6);
-                bush.add(p);
-            }
-            bush.position.set(x, 0, z);
-            scene.add(bush);
-            bushes.push({ position: new THREE.Vector3(x, 0.5, z), radius: 1.0 });
-        }
-
-        // 3. Mountains (Visible & Closer)
-        const mountainColors = [0xA5D6A7, 0x80CBC4, 0x4DB6AC];
-        for(let i=0; i<20; i++) {
-            const angle = (i / 20) * Math.PI * 2;
-            const r = 120 + Math.random()*30; // Closer (within fog)
-            const s = 30 + Math.random()*20; 
-            
-            const mMat = new THREE.MeshStandardMaterial({ color: mountainColors[Math.floor(Math.random()*mountainColors.length)], flatShading: true });
-            const m = new THREE.Mesh(new THREE.ConeGeometry(s, s*1.2, 5), mMat);
-            m.position.set(Math.cos(angle)*r, -2, Math.sin(angle)*r);
-            scene.add(m);
-        }
-
-        // 4. Ponds
+        // 4. Ponds (Generated first)
         const pondGeo = new THREE.CircleGeometry(4, 32);
-        for(let i=0; i<6; i++) {
-            const x=(Math.random()-0.5)*90, z=(Math.random()-0.5)*90;
-            if(Math.abs(x)<15 && Math.abs(z)<15) continue;
+        for(let i=0; i<5; i++) {
+            const x=(Math.random()-0.5)*120, z=(Math.random()-0.5)*120;
+            if(Math.abs(x)<10 && Math.abs(z)<10) continue;
             
             const pond = new THREE.Mesh(pondGeo, pondMat);
             pond.rotation.x = -Math.PI/2;
@@ -1787,77 +1987,343 @@
             scene.add(pond);
             ponds.push({ position: new THREE.Vector3(x, 0, z), radius: 4 * pond.scale.x });
             
-            // Add some stones around
-            for(let k=0; k<5; k++) {
-                const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3), new THREE.MeshStandardMaterial({color:0x9E9E9E}));
-                const a = Math.random()*Math.PI*2;
-                const d = 4 * pond.scale.x + 0.2;
-                stone.position.set(x + Math.cos(a)*d, 0.1, z + Math.sin(a)*d);
+            // Stones (Outside pond - Fixed position)
+            for(let k=0; k<6; k++) {
+                const stone = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), new THREE.MeshStandardMaterial({color:0x9E9E9E}));
+                const a = (k/6)*Math.PI*2 + (Math.random()-0.5)*0.2;
+                // Use ellipse radii to ensure outside
+                const rx = 4 * pond.scale.x + 0.35;
+                const rz = 4 * pond.scale.y + 0.35;
+                
+                stone.position.set(x + Math.cos(a)*rx, 0.05, z + Math.sin(a)*rz);
+                stone.rotation.set(Math.random(), Math.random(), Math.random());
                 scene.add(stone);
+                stones.push({ position: stone.position.clone(), radius: 0.35 });
             }
         }
 
-        // 5. Mushrooms (Smaller)
-        const stemGeo = new THREE.CylinderGeometry(0.03, 0.05, 0.15, 8);
-        const capGeo = new THREE.SphereGeometry(0.15, 16, 16, 0, Math.PI*2, 0, Math.PI/2);
-        for(let i=0; i<40; i++) {
+        // --- Instanced Trees ---
+        const treeCount = 150; // Increased from 80
+        // Geometries
+        const trunkGeo = new THREE.CylinderGeometry(0.18, 0.24, 1.5, 8); 
+        const branchGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.6, 6);
+        const crownGeo = new THREE.IcosahedronGeometry(0.8, 0);
+
+        // Instanced Meshes
+        // Max estimations: Branches=2/tree, Base=8/tree (Increased for fuller crown), Mid=1/tree
+        const trunkMesh = new THREE.InstancedMesh(trunkGeo, treeMat, treeCount);
+        const branchMesh = new THREE.InstancedMesh(branchGeo, treeMat, treeCount * 2);
+        const crownBaseMesh = new THREE.InstancedMesh(crownGeo, leafMat2, treeCount * 9); // Increased buffer
+        const crownMidMesh = new THREE.InstancedMesh(crownGeo, leafMat, treeCount);
+
+        trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
+        branchMesh.castShadow = true; branchMesh.receiveShadow = true;
+        crownBaseMesh.castShadow = true; crownBaseMesh.receiveShadow = true;
+        crownMidMesh.castShadow = true; crownMidMesh.receiveShadow = true;
+
+        scene.add(trunkMesh); scene.add(branchMesh); scene.add(crownBaseMesh); scene.add(crownMidMesh);
+
+        let trunkIdx=0, branchIdx=0, baseIdx=0, midIdx=0;
+        const dummyTree = new THREE.Group();
+        const dTrunk = new THREE.Mesh(trunkGeo); dummyTree.add(dTrunk);
+        const dB1 = new THREE.Mesh(branchGeo); dTrunk.add(dB1);
+        const dB2 = new THREE.Mesh(branchGeo); dTrunk.add(dB2);
+        const dCrown = new THREE.Group(); dummyTree.add(dCrown);
+        const dMid = new THREE.Mesh(crownGeo); dCrown.add(dMid);
+        const dSubs = [];
+        for(let k=0; k<9; k++) { const s=new THREE.Mesh(crownGeo); dCrown.add(s); dSubs.push(s); }
+
+        for(let i=0; i<treeCount; i++) { 
+            const x = (Math.random() - 0.5) * 180;
+            const z = (Math.random() - 0.5) * 180;
+            if(Math.abs(x)<5 && Math.abs(z)<5) continue; 
+            let inPond = false;
+            for(let p of ponds) {
+                if(new THREE.Vector3(x,0,z).distanceTo(p.position) < p.radius + 2.0) { inPond = true; break; }
+            }
+            if(inPond) continue;
+
+            // Setup dummy tree hierarchy
+            const scaleH = 1.1 + (Math.random()-0.5) * 0.4; 
+            dummyTree.position.set(x, 0, z);
+            dummyTree.rotation.y = Math.random() * Math.PI * 2;
+            dummyTree.scale.setScalar(1 + Math.random()*0.8);
+            
+            // Trunk
+            dTrunk.position.y = 0.75 * scaleH;
+            dTrunk.scale.set(1, scaleH, 1);
+            
+            // Branches
+            dB1.position.set(0.12, 0.55 * scaleH, 0);
+            dB1.rotation.set(-0.2, Math.random(), 0.45);
+            dB2.position.set(-0.12, 0.55 * scaleH, 0);
+            dB2.rotation.set(-0.2, dB1.rotation.y + Math.PI, -0.45);
+
+            // Crown
+            dCrown.position.y = 1.8 * scaleH;
+            // Center crown with slight random jitter
+            dMid.position.set((Math.random()-0.5)*0.05, 0.2 + (Math.random()-0.5)*0.05, (Math.random()-0.5)*0.05);
+            dMid.rotation.set((Math.random()-0.5)*0.3, (Math.random()-0.5)*0.3, (Math.random()-0.5)*0.3);
+            dMid.scale.setScalar(1.0 + (Math.random()-0.5)*0.1);
+
+            // Subs (Regular arrangement with controlled randomness)
+            const baseCount = 8; 
+            for(let k=0; k<9; k++) {
+                if(k < baseCount) {
+                    dSubs[k].visible = true;
+                    
+                    // Add small random jitter to angle and radius
+                    const angleJitter = (Math.random() - 0.5) * 0.4; 
+                    const radiusJitter = (Math.random() - 0.5) * 0.15;
+                    const ang = (k/baseCount)*Math.PI*2 + angleJitter; 
+                    const r = 0.6 + radiusJitter;
+                    
+                    // Add small random jitter to Y position
+                    const yJitter = (Math.random() - 0.5) * 0.15;
+
+                    dSubs[k].position.set(Math.cos(ang)*r, -0.35 + yJitter, Math.sin(ang)*r); 
+                    
+                    // Random rotation for natural look
+                    dSubs[k].rotation.set(
+                        (Math.random()-0.5)*0.6, 
+                        (Math.random()-0.5)*0.6, 
+                        (Math.random()-0.5)*0.6
+                    );
+                    
+                    // Random scale jitter
+                    const scaleJitter = (Math.random() - 0.5) * 0.15;
+                    dSubs[k].scale.setScalar(0.85 + scaleJitter); 
+                } else {
+                    dSubs[k].visible = false;
+                    dSubs[k].scale.setScalar(0); // Hide
+                }
+            }
+
+            // Update matrices
+            dummyTree.updateMatrixWorld(true);
+
+            // Copy to instances
+            trunkMesh.setMatrixAt(trunkIdx++, dTrunk.matrixWorld);
+            branchMesh.setMatrixAt(branchIdx++, dB1.matrixWorld);
+            branchMesh.setMatrixAt(branchIdx++, dB2.matrixWorld);
+            crownMidMesh.setMatrixAt(midIdx++, dMid.matrixWorld);
+            for(let k=0; k<baseCount; k++) {
+                crownBaseMesh.setMatrixAt(baseIdx++, dSubs[k].matrixWorld);
+            }
+
+            trees.push({ position: new THREE.Vector3(x, 0, z), radius: 1.0 });
+        }
+        // Trim unused
+        trunkMesh.count = trunkIdx;
+        branchMesh.count = branchIdx;
+        crownMidMesh.count = midIdx;
+        crownBaseMesh.count = baseIdx;
+        trunkMesh.instanceMatrix.needsUpdate = true;
+        branchMesh.instanceMatrix.needsUpdate = true;
+        crownMidMesh.instanceMatrix.needsUpdate = true;
+        crownBaseMesh.instanceMatrix.needsUpdate = true;
+
+
+        // --- Instanced Bushes ---
+        const bushCount = 100; // Increased from 30
+        const bushGeo = new THREE.IcosahedronGeometry(0.32, 1);
+        const bushMesh = new THREE.InstancedMesh(bushGeo, bushMat, bushCount * 8); // 8 parts per bush
+
+        bushMesh.castShadow = true; bushMesh.receiveShadow = true;
+        scene.add(bushMesh);
+        
+        let bushIdx = 0;
+        const dummyBush = new THREE.Group();
+        const bParts = [];
+        for(let i=0; i<8; i++) { const p=new THREE.Mesh(bushGeo); dummyBush.add(p); bParts.push(p); }
+
+        for(let i=0; i<bushCount; i++) {
+            const x=(Math.random()-0.5)*160, z=(Math.random()-0.5)*160;
+            if(Math.abs(x)<5 && Math.abs(z)<5) continue;
+            let nearPond=false; for(let p of ponds){ if(new THREE.Vector3(x,0,z).distanceTo(p.position) < p.radius + 0.5){ nearPond=true; break; } }
+            if(nearPond) continue;
+
+            dummyBush.position.set(x, 0.06, z);
+            dummyBush.updateMatrixWorld(true);
+
+            // Parts logic (4 base, 3 mid, 1 top)
+            let partK = 0;
+            // Base
+            for(let j=0; j<4; j++) {
+                const ang = (j/4)*Math.PI*2;
+                bParts[partK].position.set(Math.cos(ang)*0.5 + (Math.random()-0.5)*0.05, 0.08, Math.sin(ang)*0.5 + (Math.random()-0.5)*0.05);
+                bParts[partK].scale.setScalar(0.95 + (Math.random()*0.05));
+                partK++;
+            }
+            // Mid
+            for(let j=0; j<3; j++) {
+                const ang = (j/3)*Math.PI*2 + 0.4;
+                bParts[partK].position.set(Math.cos(ang)*0.35 + (Math.random()-0.5)*0.05, 0.26, Math.sin(ang)*0.35 + (Math.random()-0.5)*0.05);
+                bParts[partK].scale.setScalar(0.9 + (Math.random()*0.05));
+                partK++;
+            }
+            // Top
+            bParts[partK].position.set((Math.random()-0.5)*0.1, 0.42 + Math.random()*0.05, (Math.random()-0.5)*0.1);
+            bParts[partK].scale.setScalar(0.85 + (Math.random()*0.05));
+            partK++;
+
+            dummyBush.updateMatrixWorld(true);
+            for(let k=0; k<8; k++) {
+                bushMesh.setMatrixAt(bushIdx++, bParts[k].matrixWorld);
+            }
+            bushes.push({ position: new THREE.Vector3(x, 0.5, z), radius: 1.0 });
+        }
+        bushMesh.count = bushIdx;
+        bushMesh.instanceMatrix.needsUpdate = true;
+
+        // 3. Mountains (Distant Background) - Varied Distance for Fading
+        const mountainColors = [
+            0x1B5E20, 0x2E7D32, 0x388E3C, 0x43A047, 0x2BAF84
+        ];
+        // More mountains, spread out
+        for(let i=0; i<24; i++) {
+            const angle = (i / 24) * Math.PI * 2 + (Math.random()-0.5)*0.2;
+            // Increase distance: 800 to 1800
+            const r = 800 + Math.random() * 1000; 
+            
+            const s = (60 + Math.random() * 40) * 1.5;
+            
+            // Use StandardMaterial to react to Fog + Lights
+            const mMat = new THREE.MeshStandardMaterial({ 
+                color: mountainColors[Math.floor(Math.random()*mountainColors.length)],
+                roughness: 0.9
+            });
+            
+            const mGeom = new THREE.SphereGeometry(s, 16, 12, 0, Math.PI*2, 0, Math.PI/2);
+            const m = new THREE.Mesh(mGeom, mMat);
+            m.scale.set(1 + Math.random()*0.5, 1.2 + Math.random()*0.8, 1 + Math.random()*0.5); 
+            m.position.set(Math.cos(angle)*r, -10, Math.sin(angle)*r);
+            
+            // Notch effect
+            const posAttr = m.geometry.attributes.position;
+            const notch = 0.15;
+            for(let vi=0; vi<posAttr.count; vi++){
+                const x = posAttr.getX(vi), y = posAttr.getY(vi), z = posAttr.getZ(vi);
+                const yn = (y + s*0.0) / s;
+                const g = 1 - notch * Math.exp(-((yn - 0.45)*(yn - 0.45))/0.02);
+                posAttr.setX(vi, x * g);
+                posAttr.setZ(vi, z * g);
+            }
+            posAttr.needsUpdate = true;
+            scene.add(m);
+        }
+
+        // 5. Mushrooms (Instanced)
+        const mushStemMatInst = new THREE.MeshStandardMaterial({color: 0xFFE0B2});
+        const mushCapMatInst = new THREE.MeshStandardMaterial({color: 0xE57373});
+        const mushStemGeo = new THREE.CylinderGeometry(0.03, 0.05, 0.15, 8);
+        const mushCapGeo = new THREE.SphereGeometry(0.15, 16, 8, 0, Math.PI*2, 0, Math.PI/2);
+        
+        const mushCount = 10;
+        const mushStemMesh = new THREE.InstancedMesh(mushStemGeo, mushStemMatInst, mushCount);
+        const mushCapMesh = new THREE.InstancedMesh(mushCapGeo, mushCapMatInst, mushCount);
+        scene.add(mushStemMesh); scene.add(mushCapMesh);
+        
+        let mushIdx = 0;
+        const dummyMush = new THREE.Group();
+        const dMStem = new THREE.Mesh(mushStemGeo); dMStem.position.y = 0.07; dummyMush.add(dMStem);
+        const dMCap = new THREE.Mesh(mushCapGeo); dMCap.position.y = 0.15; dummyMush.add(dMCap);
+
+        for(let i=0; i<mushCount; i++) {
              const x=(Math.random()-0.5)*80, z=(Math.random()-0.5)*80;
              if(Math.abs(x)<5 && Math.abs(z)<5) continue;
              
-             const mush = new THREE.Group();
-             const stem = new THREE.Mesh(stemGeo, mushStemMat);
-             stem.position.y = 0.07;
-             mush.add(stem);
+             dummyMush.position.set(x, 0, z);
+             dummyMush.scale.setScalar(0.3 + Math.random()*0.3);
+             dummyMush.updateMatrixWorld(true);
              
-             const cap = new THREE.Mesh(capGeo, mushCapMat);
-             cap.position.y = 0.15;
-             mush.add(cap);
-             
-             mush.position.set(x, 0, z);
-             // Smaller scale (Fixed: much smaller per user request)
-             mush.scale.setScalar(0.3 + Math.random()*0.3);
-             scene.add(mush);
+             mushStemMesh.setMatrixAt(mushIdx, dMStem.matrixWorld);
+             mushCapMesh.setMatrixAt(mushIdx, dMCap.matrixWorld);
+             mushIdx++;
              mushrooms.push({ position: new THREE.Vector3(x, 0, z) });
         }
+        mushStemMesh.count = mushIdx; mushCapMesh.count = mushIdx;
+        mushStemMesh.instanceMatrix.needsUpdate = true; mushCapMesh.instanceMatrix.needsUpdate = true;
 
-        // 6. Flowers (Pastel)
+        // 6. Flowers (Instanced)
+        const flowerCount = 60; 
         const petalGeo = new THREE.CircleGeometry(0.08, 5);
-        const colors = [0xFFAB91, 0xFFCC80, 0xE6EE9C, 0x80DEEA];
-        for(let i=0; i<200; i++) {
-            const x=(Math.random()-0.5)*140, z=(Math.random()-0.5)*140;
+        const centerGeo = new THREE.CircleGeometry(0.04, 8);
+        const stemGeo = new THREE.CylinderGeometry(0.02, 0.02, 1, 8); // Base height 1
+
+        const petalMat = new THREE.MeshBasicMaterial({side: THREE.DoubleSide, vertexColors: true}); 
+        const centerMat = new THREE.MeshBasicMaterial({color:0xFFEB3B});
+        const stemMat = new THREE.MeshStandardMaterial({color:0x4CAF50, roughness:0.8});
+
+        flowerStemMesh = new THREE.InstancedMesh(stemGeo, stemMat, flowerCount);
+        flowerPetalMesh = new THREE.InstancedMesh(petalGeo, petalMat, flowerCount * 5);
+        flowerCenterMesh = new THREE.InstancedMesh(centerGeo, centerMat, flowerCount);
+
+        scene.add(flowerStemMesh); scene.add(flowerPetalMesh); scene.add(flowerCenterMesh);
+        
+        const fColors = [0xFFFFFF, 0xFFC0CB, 0xFFB6C1]; 
+        const _fColor = new THREE.Color();
+        const fDummy = new THREE.Object3D();
+        
+        let fIdx = 0;
+        let fPetalIdx = 0;
+        
+        for(let i=0; i<flowerCount; i++) {
+            const x=(Math.random()-0.5)*80, z=(Math.random()-0.5)*80;
             if(Math.abs(x)<3 && Math.abs(z)<3) continue;
+            let nearPond=false; for(let p of ponds){ if(new THREE.Vector3(x,0,z).distanceTo(p.position) < p.radius + 0.5){ nearPond=true; break; } }
+            if(nearPond) continue;
 
-            const flower = new THREE.Group();
-            const color = colors[Math.floor(Math.random()*colors.length)];
-            const fMat = new THREE.MeshBasicMaterial({color: color, side: THREE.DoubleSide});
+            const stemH = 0.18 + Math.random()*0.12;
+            const colorHex = fColors[Math.floor(Math.random()*fColors.length)];
             
+            flowerInstances.push({
+                position: new THREE.Vector3(x, 0, z),
+                phi: Math.random()*Math.PI*2,
+                theta: (Math.PI/6) + Math.random()*(Math.PI/3),
+                stemH: stemH,
+                color: colorHex
+            });
+            
+            // Stem (Static)
+            fDummy.position.set(x, stemH/2, z);
+            fDummy.rotation.set(0,0,0);
+            fDummy.scale.set(1, stemH, 1);
+            fDummy.updateMatrix();
+            flowerStemMesh.setMatrixAt(fIdx, fDummy.matrix);
+            
+            // Petals Color
+            _fColor.setHex(colorHex);
             for(let p=0; p<5; p++) {
-                const petal = new THREE.Mesh(petalGeo, fMat);
-                petal.position.set(Math.cos(p*Math.PI*2/5)*0.08, 0, Math.sin(p*Math.PI*2/5)*0.08);
-                petal.rotation.x = -Math.PI/2;
-                flower.add(petal);
+                flowerPetalMesh.setColorAt(fPetalIdx + p, _fColor);
             }
-            const center = new THREE.Mesh(new THREE.CircleGeometry(0.04, 8), new THREE.MeshBasicMaterial({color:0xFFEB3B}));
-            center.rotation.x = -Math.PI/2; center.position.y = 0.01;
-            flower.add(center);
-
-            flower.position.set(x, 0.02, z);
-            scene.add(flower);
-            flowers.push({ position: new THREE.Vector3(x, 0.05, z) });
+            
+            fIdx++;
+            fPetalIdx += 5;
         }
+        
+        flowerStemMesh.count = fIdx;
+        flowerCenterMesh.count = fIdx;
+        flowerPetalMesh.count = fPetalIdx;
+        
+        flowerStemMesh.instanceMatrix.needsUpdate = true;
+        if (flowerPetalMesh.instanceColor) flowerPetalMesh.instanceColor.needsUpdate = true;
     }
+
     createNature();
 
     // --- 光照 & Fog (Cyan-Green Atmosphere) ---
     const hemiLight = new THREE.HemisphereLight(0xE0F2F1, 0x1B5E20, 0.6); scene.add(hemiLight); // Cyan Sky, Green Ground
     const dirLight = new THREE.DirectionalLight(0xFFF176, 1.2); 
     dirLight.position.set(50, 80, 30); dirLight.castShadow = true; 
-    dirLight.shadow.mapSize.set(2048, 2048);
-    const d=80; dirLight.shadow.camera.left=-d; dirLight.shadow.camera.right=d; dirLight.shadow.camera.top=d; dirLight.shadow.camera.bottom=-d;
+    dirLight.shadow.mapSize.set(512, 512);
+        const d=80; dirLight.shadow.camera.left=-d; dirLight.shadow.camera.right=d; dirLight.shadow.camera.top=d; dirLight.shadow.camera.bottom=-d;
+        dirLight.shadow.mapSize.set(512, 512);
     scene.add(dirLight);
 
     // Fog for "Fading Distance"
-    scene.fog = new THREE.Fog(0xE0F7FA, 60, 220); // Light Cyan Fog
+    // Fog extended to match new camera far plane for smoother fade
+    scene.fog = new THREE.Fog(0xE0F7FA, 200, 1500);
     scene.background = new THREE.Color(0xE0F7FA);
 
     window.setWeather = function(type) {
@@ -1872,18 +2338,19 @@
     }
 
     // --- Visual Effects & Time System ---
-    let stars, fireflies, dust, godRays;
+    let stars, fireflies, dust, rainSystem;
     const fishes = [];
+    let envCounter = 0;
     
     function createVisualEffects() {
         // 1. Stars (Night only)
         const starGeo = new THREE.BufferGeometry();
         const starPos = [];
         for(let i=0; i<1000; i++) {
-            starPos.push((Math.random()-0.5)*400, 50 + Math.random()*100, (Math.random()-0.5)*400);
+            starPos.push((Math.random()-0.5)*600, 300 + Math.random()*300, (Math.random()-0.5)*600);
         }
         starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-        stars = new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xFFFFFF, size: 0.5, transparent: true, opacity: 0}));
+        stars = new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xFFFFFF, size: 0.35, transparent: true, opacity: 0, depthTest: true}));
         scene.add(stars);
 
         // 2. Fireflies (Night only)
@@ -1895,40 +2362,33 @@
         fireflyGeo.setAttribute('position', new THREE.Float32BufferAttribute(fireflyPos, 3));
         // Store initial positions for animation
         fireflyGeo.userData = { initPos: [...fireflyPos] }; 
-        fireflies = new THREE.Points(fireflyGeo, new THREE.PointsMaterial({color: 0xCCFF00, size: 0.3, transparent: true, opacity: 0}));
+        fireflies = new THREE.Points(fireflyGeo, new THREE.PointsMaterial({color: 0xCCFF00, size: 0.15, transparent: true, opacity: 0}));
         scene.add(fireflies);
 
         // 3. Floating Dust (Day/Evening)
         const dustGeo = new THREE.BufferGeometry();
         const dustPos = [];
-        for(let i=0; i<200; i++) {
+        for(let i=0; i<120; i++) {
             dustPos.push((Math.random()-0.5)*100, Math.random()*10, (Math.random()-0.5)*100);
         }
         dustGeo.setAttribute('position', new THREE.Float32BufferAttribute(dustPos, 3));
-        dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({color: 0xFFFFFF, size: 0.1, transparent: true, opacity: 0.6}));
+        dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({color: 0xFFFFFF, size: 0.06, transparent: true, opacity: 0.6}));
         scene.add(dust);
 
-        // 4. God Rays (Tyndall Effect) - Cones pointing down
-        godRays = new THREE.Group();
-        const rayGeo = new THREE.ConeGeometry(5, 20, 32, 1, true); // Open ended
-        const rayMat = new THREE.MeshBasicMaterial({
-            color: 0xFFF59D, 
-            transparent: true, 
-            opacity: 0.1, 
-            side: THREE.DoubleSide,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
-        });
-        
-        for(let i=0; i<5; i++) {
-            const ray = new THREE.Mesh(rayGeo, rayMat);
-            ray.position.set((Math.random()-0.5)*50, 10, (Math.random()-0.5)*50);
-            ray.rotation.x = Math.PI; // Point down
-            ray.rotation.z = (Math.random()-0.5)*0.2;
-            ray.scale.setScalar(1 + Math.random());
-            godRays.add(ray);
+        // 4. Rain (Occasional Light Rain) - Replaces God Rays
+        const rainGeo = new THREE.BufferGeometry();
+        const rainPos = [];
+        for(let i=0; i<400; i++) { // Reduced from 1200 to 400
+            rainPos.push((Math.random()-0.5)*150, Math.random()*100, (Math.random()-0.5)*150);
         }
-        scene.add(godRays);
+        rainGeo.setAttribute('position', new THREE.Float32BufferAttribute(rainPos, 3));
+        rainSystem = new THREE.Points(rainGeo, new THREE.PointsMaterial({
+            color: 0xAAAAAA, 
+            size: 0.1, 
+            transparent: true, 
+            opacity: 0
+        }));
+        scene.add(rainSystem);
 
         // 5. Fishes (Jumping)
         const fishGeo = new THREE.SphereGeometry(0.2, 8, 8); // Simple fish body
@@ -1962,45 +2422,64 @@
     createVisualEffects();
 
     // --- Time & Environment Control ---
-    // 0.0 - 0.2: Sunrise
-    // 0.2 - 0.6: Day (Cyan/Green)
-    // 0.6 - 0.8: Sunset (Golden)
-    // 0.8 - 1.0: Night (Blue/Dark)
-    let gameTime = 0.65; // Start at Golden Evening
-    const dayDuration = 120; // seconds per day
-
+    // Real-time sync
+    let gameTime = 0; 
+    
     function updateEnvironment(dt) {
-        gameTime += dt / dayDuration;
-        if(gameTime > 1) gameTime -= 1;
+        envCounter++;
+        // Sync with Real Time
+        const now = new Date();
+        const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+        gameTime = currentSeconds / 86400; // 0.0 to 1.0
 
-        const t = gameTime;
+        // Shift time to match lighting phases
+        // Current Phases: 0.0-0.2 (Sunrise), 0.2-0.6 (Day), 0.6-0.75 (Sunset), 0.75-1.0 (Night)
+        // Real Time: 0.0 (Midnight). We want Night at Midnight.
+        // So we need to map:
+        // 6am (0.25) -> Sunrise Start (0.0)
+        // 12pm (0.5) -> Day (0.4)
+        // 6pm (0.75) -> Sunset Start (0.6)
+        // 
+        // Let's adjust the phases to match Real Time (0.0 = Midnight)
+        // 0.0 - 0.25: Night
+        // 0.25 - 0.35: Sunrise (6am-8am)
+        // 0.35 - 0.7: Day
+        // 0.7 - 0.8: Sunset (5pm-7pm)
+        // 0.8 - 1.0: Night
+        
+        let t = gameTime;
+        const hours = now.getHours();
+        if(hours >= 17 && hours < 19) {
+            t = 0.75; // Ensure sunset lighting at local 18:00
+        }
         
         // Light Colors
         let skyColor, groundColor, sunColor, sunIntensity, fogColor;
         
-        if(t < 0.2) { // Sunrise
-            skyColor = new THREE.Color(0xFFCC80);
+        if(t >= 0.25 && t < 0.35) { // Sunrise (6am-8am)
+            const p = (t-0.25)/0.1;
+            skyColor = new THREE.Color().lerpColors(new THREE.Color(0x1A237E), new THREE.Color(0xFFCC80), p);
             groundColor = new THREE.Color(0x81C784);
             sunColor = new THREE.Color(0xFFE0B2);
-            sunIntensity = 0.8;
-            fogColor = new THREE.Color(0xFFE0B2);
-            if(stars) stars.material.opacity = 1 - (t/0.2);
-        } else if(t < 0.6) { // Day
+            sunIntensity = 0.3 + p*0.7;
+            fogColor = new THREE.Color().lerpColors(new THREE.Color(0x1A237E), new THREE.Color(0xFFE0B2), p);
+            if(stars) stars.material.opacity = 1 - p;
+        } else if(t >= 0.35 && t < 0.7) { // Day (8am-5pm)
             skyColor = new THREE.Color(0xE0F2F1);
             groundColor = new THREE.Color(0x1B5E20);
-            sunColor = new THREE.Color(0xFFF176);
-            sunIntensity = 1.2;
+            sunColor = new THREE.Color(0xFFC107); // Golden Light
+            sunIntensity = 1.3;
             fogColor = new THREE.Color(0xE0F7FA);
             if(stars) stars.material.opacity = 0;
-        } else if(t < 0.75) { // Sunset (Golden)
-            const p = (t-0.6)/0.15;
+        } else if(t >= 0.7 && t < 0.8) { // Sunset (5pm-7pm)
+            const p = (t-0.7)/0.1;
             skyColor = new THREE.Color().lerpColors(new THREE.Color(0xE0F2F1), new THREE.Color(0xFFAB91), p);
             groundColor = new THREE.Color(0x33691E);
             sunColor = new THREE.Color(0xFF9800);
-            sunIntensity = 1.0;
+            sunIntensity = 1.0 - p*0.5;
             fogColor = new THREE.Color().lerpColors(new THREE.Color(0xE0F7FA), new THREE.Color(0xFFCC80), p);
-            if(stars) stars.material.opacity = 0;
-        } else { // Night
+            if(stars) stars.material.opacity = p;
+        } else { // Night (7pm-6am)
             skyColor = new THREE.Color(0x1A237E);
             groundColor = new THREE.Color(0x000000);
             sunColor = new THREE.Color(0x5C6BC0); // Moon
@@ -2022,7 +2501,7 @@
         // Fireflies (Only at night)
         if(fireflies) {
              fireflies.material.opacity = (t > 0.75 || t < 0.1) ? 1 : 0;
-             if(fireflies.material.opacity > 0) {
+             if(fireflies.material.opacity > 0 && envCounter % 6 === 0) { // Reduced update frequency
                  const time = Date.now() * 0.001;
                  const pos = fireflies.geometry.attributes.position;
                  const init = fireflies.geometry.userData.initPos;
@@ -2035,7 +2514,7 @@
         }
         
         // Dust (Always visible but subtle)
-        if(dust) {
+        if(dust && envCounter % 5 === 0) { // Reduced update frequency
             const pos = dust.geometry.attributes.position;
             for(let i=0; i<pos.count; i++) {
                 let y = pos.getY(i);
@@ -2046,10 +2525,60 @@
             pos.needsUpdate = true;
         }
         
-        // God Rays (Rotate slowly)
-        if(godRays) {
-            godRays.rotation.y += dt * 0.05;
-            godRays.visible = (t > 0.2 && t < 0.75); // Day/Sunset only
+        // Rain (Occasional Light Rain)
+        if(rainSystem && envCounter % 4 === 0) { // Reduced update frequency
+             const pos = rainSystem.geometry.attributes.position;
+             for(let i=0; i<pos.count; i++) {
+                 let y = pos.getY(i);
+                 y -= dt * 20; // Fast fall
+                 if(y < 0) y = 100;
+                 pos.setY(i, y);
+             }
+             pos.needsUpdate = true;
+             
+             // Simple weather cycle: Rain every 30s for 10s?
+             // For now, just keep it light and constant for atmosphere
+             rainSystem.material.opacity = 0.2; 
+        }
+
+        // Flower Sway (Instanced)
+        if(flowerInstances && flowerInstances.length) {
+            const time = Date.now() * 0.001;
+            const dummy = new THREE.Object3D();
+            const dummyPetal = new THREE.Object3D();
+            
+            let pIdx = 0;
+            flowerInstances.forEach((f, i) => {
+                const sway = Math.sin(time*1.5 + i) * 0.05;
+                const currentTheta = f.theta + sway;
+                
+                // Head matrix
+                dummy.position.set(f.position.x, f.stemH, f.position.z);
+                dummy.rotation.set(Math.sin(f.phi) * currentTheta, 0, Math.cos(f.phi) * currentTheta);
+                dummy.updateMatrix();
+                
+                // Update Center (child of Head)
+                dummyPetal.position.set(0, 0.01, 0);
+                dummyPetal.rotation.set(-Math.PI/2, 0, 0);
+                dummyPetal.scale.set(1,1,1);
+                dummyPetal.updateMatrix();
+                
+                const centerMat = dummy.matrix.clone().multiply(dummyPetal.matrix);
+                flowerCenterMesh.setMatrixAt(i, centerMat);
+                
+                // Update Petals
+                for(let p=0; p<5; p++) {
+                    const ang = p*Math.PI*2/5;
+                    dummyPetal.position.set(Math.cos(ang)*0.08, 0, Math.sin(ang)*0.08);
+                    dummyPetal.rotation.set(-Math.PI/2, 0, 0);
+                    dummyPetal.updateMatrix();
+                    
+                    const pMat = dummy.matrix.clone().multiply(dummyPetal.matrix);
+                    flowerPetalMesh.setMatrixAt(pIdx++, pMat);
+                }
+            });
+            flowerCenterMesh.instanceMatrix.needsUpdate = true;
+            flowerPetalMesh.instanceMatrix.needsUpdate = true;
         }
 
         // Fish Jumping
@@ -2086,6 +2615,7 @@
         requestAnimationFrame(animate);
         const time = Date.now() * 0.001;
         const dt = clock.getDelta();
+        const ownerIdle = (time - lastOwnerInteractionTime) > OWNER_IDLE_THRESHOLD;
 
         updateEnvironment(dt);
 
@@ -2099,7 +2629,7 @@
             if (dist < 0.3) {
                 currentState = STATE.IDLE; targetRing.visible = false;
                 legs.forEach(l=>l.rotation.x=0); corgiBody.position.y=0;
-                legs.forEach(l => l.position.y = -0.1); // Reset
+                runStateStart = 0; lastRunDist = Infinity; lastDistDecreaseTime = 0;
                 return;
             }
 
@@ -2112,9 +2642,9 @@
             while(diff > Math.PI) diff -= Math.PI*2; 
             while(diff < -Math.PI) diff += Math.PI*2;
             
-            // Only move if angle is very small (facing target)
+            // Turn if angle difference is significant
             if (Math.abs(diff) > 0.05) { 
-                 const rotSpeed = 0.1; 
+                 const rotSpeed = 0.15; // Increased turn speed
                  corgiGroup.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), rotSpeed);
                  
                  // 原地踏步动画 (Stepping in place while turning)
@@ -2123,22 +2653,53 @@
                     leg.rotation.x = Math.sin(turnPhase + (i % 2 === 0 ? 0 : Math.PI)) * 0.3;
                  });
             } 
-            // 2. 移动阶段 (Move Phase) - Only when aligned
-            else if(dist > 0.1) {
+                // 2. 移动阶段 (Move Phase) - STRICTLY only when aligned
+            else if(dist > 0.1 && Math.abs(diff) <= 0.1) {
                 // corgiGroup.rotation.y = targetAngle; // Smooth turn handles this, no snap needed
                 
                 let currentSpeed = dogSpeed;
-                if(currentPet === 'buffalo') currentSpeed *= 0.5; 
-                else if(currentPet === 'rabbit') currentSpeed *= 0.8; 
-                else if(currentPet === 'cat') currentSpeed *= 0.7; 
+                // Further reduced speeds per request
+                if(currentPet === 'rabbit') currentSpeed *= 0.5; 
+                else if(currentPet === 'cat') currentSpeed *= 0.6; 
+                else currentSpeed *= 0.7;
 
+                // Ensure we move in the direction we are FACING
                 const forward = new THREE.Vector3(Math.sin(corgiGroup.rotation.y), 0, Math.cos(corgiGroup.rotation.y));
-                const nextPos = dogPos.clone().addScaledVector(forward, currentSpeed);
+                const desired = targetPos.clone().sub(dogPos).normalize();
+                const align = forward.dot(desired);
+                // progress tracking to avoid getting stuck
+                if(runStateStart === 0){
+                    runStateStart = time;
+                    lastRunDist = dist;
+                    lastDistDecreaseTime = time;
+                } else {
+                    if(dist < lastRunDist - 0.01){ // progress epsilon
+                        lastDistDecreaseTime = time;
+                    }
+                    lastRunDist = dist;
+                }
+
+                let alignThresh = 0.999;
+                if(time - lastDistDecreaseTime > 3) { // stuck fallback
+                    alignThresh = 0.95;
+                    currentSpeed *= 0.8;
+                }
+                if(align < alignThresh) { 
+                    // Not aligned enough: keep turning, do not move
+                    return;
+                }
+                // Prevent backward/sideways drift: clamp step to positive projection
+                const step = forward.clone().multiplyScalar(currentSpeed);
+                if(step.dot(desired) <= 0) return;
+                const nextPos = dogPos.clone().add(step);
 
                 // Collision (Trees & Ponds)
                 let collision = false;
                 for(let tree of trees) {
-                    if(nextPos.distanceTo(tree.position) < tree.radius + 0.3) {
+                    const dx = nextPos.x - tree.position.x;
+                    const dz = nextPos.z - tree.position.z;
+                    if(Math.abs(dx) > 2.5 || Math.abs(dz) > 2.5) continue;
+                    if(dx*dx + dz*dz < (tree.radius + 0.2)*(tree.radius + 0.2)) {
                         collision = true; break;
                     }
                 }
@@ -2149,6 +2710,11 @@
                             collision = true; break;
                         }
                     }
+                }
+
+                // World boundary: prevent moving into far ocean/plain
+                if(!collision && nextPos.length() > WORLD_RADIUS) {
+                    collision = true;
                 }
 
                 if (collision) {
@@ -2174,50 +2740,53 @@
                         // Fixed: Legs stay attached to body
                         // legs.forEach(l => l.position.y = -0.1 + Math.abs(Math.sin(hopPhase))*0.08);
 
-                    } else if(currentPet === 'buffalo') {
-                        // 水牛: 沉重步伐
-                        const walkPhase = time * 8;
-                        legs.forEach((leg, i) => {
-                            leg.rotation.x = Math.sin(walkPhase + (i%2===0?0:Math.PI)) * 0.4;
-                        });
-                        corgiBody.rotation.z = Math.sin(walkPhase * 0.5) * 0.05; // 左右晃
-                        corgiBody.position.y = Math.abs(Math.sin(walkPhase)) * 0.02;
-                        if(tail) tail.rotation.z = Math.sin(walkPhase) * 0.2;
-
                     } else if(currentPet === 'cat') {
-                        // 猫咪: 优雅猫步
-                        const walkPhase = time * 10;
+                        const walkPhase = time * 8;
+                        const stepAmp = Math.min(0.5, Math.max(0.4, currentSpeed * 10));
                         legs.forEach((leg, i) => {
-                            leg.rotation.x = Math.sin(walkPhase + (i%2===0?0:Math.PI)) * 0.5;
+                            leg.rotation.x = Math.sin(walkPhase + (i%2===0?0:Math.PI)) * stepAmp;
                         });
-                        corgiBody.position.y = Math.abs(Math.sin(walkPhase)) * 0.03;
-                        // 脊柱柔动
-                        corgiBody.rotation.y += Math.sin(walkPhase)*0.005; 
+                        corgiBody.position.y = Math.abs(Math.sin(walkPhase)) * Math.min(0.05, currentSpeed * 2.0);
+                        corgiBody.rotation.y += Math.sin(walkPhase)*Math.min(0.005, currentSpeed * 0.3);
                         if(tail) {
-                            tail.rotation.y = Math.sin(walkPhase * 0.5) * 0.3;
-                            tail.rotation.x = 0.2; // 尾巴翘起
+                            tail.rotation.y = Math.sin(walkPhase * 0.5) * Math.min(0.3, currentSpeed * 10);
+                            tail.rotation.x = 0.25;
                         }
 
-                    } else {
-                        // 柯基: 欢快小跑
-                        const runPhase = time * 20;
-                        legs.forEach((leg, i) => {
-                            leg.rotation.x = Math.sin(runPhase + (i%2===0?0:Math.PI)) * 0.8;
-                        });
-                        corgiBody.position.y = Math.abs(Math.sin(runPhase)) * 0.05;
-                        corgiBody.rotation.z = Math.sin(runPhase * 0.5) * 0.1; // 屁股扭
-                        if(tail) tail.rotation.z = Math.sin(runPhase) * 0.8; // 摇尾巴
-                    }
-                }
             } else {
-                currentState = STATE.IDLE; targetRing.visible = false;
-                legs.forEach(l=>l.rotation.x=0); corgiBody.position.y=0;
+                // 柯基: 欢快小跑（始终正向）
+                const runPhase = time * 20;
+                legs.forEach((leg, i) => {
+                    leg.rotation.x = Math.sin(runPhase + (i%2===0?0:Math.PI)) * 0.8;
+                });
+                corgiBody.position.y = Math.abs(Math.sin(runPhase)) * 0.05;
+                corgiBody.rotation.z = Math.sin(runPhase * 0.5) * 0.1; // 屁股扭
+                headGroup.rotation.x = 0.1 + Math.abs(Math.sin(runPhase))*0.04;
+                if(tail) tail.rotation.z = Math.sin(runPhase) * 0.8; // 摇尾巴
             }
+                }
+            }
+
         } else {
+            // Idle State Logic - Short Range Exploration
+            if (ownerIdle && Math.random() < 0.002) {
+                const center = new THREE.Vector3(camera.position.x, 0, camera.position.z);
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 0.5 + Math.random() * 2.0;
+                const dest = center.clone().add(new THREE.Vector3(Math.cos(angle)*dist, 0, Math.sin(angle)*dist));
+                
+                // Ensure we don't go too far from center/camera focus if needed, 
+                // but here we just check validity.
+                if(isValidPos(dest)) {
+                    targetPos.copy(dest);
+                    currentState = STATE.RUN;
+                    if(Math.random() < 0.3) showThought("(到处看看...)");
+                    return;
+                }
+            }
+
             // Idle Animations (Sit, Beg, Sniff)
-            // const idleTime = time % 10; // Loop every 10s
-            
-            corgiBody.scale.y = 1 + Math.sin(time*3)*0.01;
+            corgiBody.scale.y = 1;
             if(tail) tail.rotation.z = Math.sin(time*5)*0.2;
             
             // Ear Wiggle (Idle)
@@ -2230,29 +2799,67 @@
         }
 
         corgiGroup.position.copy(dogPos);
+        if(corgiBody.position.y < 0) corgiBody.position.y = 0;
         
         // 相机跟随 & 距离保持
         const targetCam = dogPos.clone().add(new THREE.Vector3(0, 0.6, 0));
-        controls.target.lerp(targetCam, 0.1);
+        controls.target.lerp(targetCam, 0.6);
         
         const camDist = camera.position.distanceTo(controls.target);
-        let minCamDist = 4.0; 
-        let maxCamDist = 12.0;
+        let minCamDist = 1.5; 
+        let maxCamDist = 3.0;
         
+        // Limit Camera Height (Tree top max)
+        if (camera.position.y > maxTrunkTop) camera.position.y = maxTrunkTop;
+        if (camera.position.y < 0.5) camera.position.y = 0.5;
+
+        // Limit Camera Angle (Pitch)
+        controls.minPolarAngle = 0.1; // Don't look from directly above/below
+        controls.maxPolarAngle = Math.PI / 2 - 0.1; // Don't go below ground
+
         // 交互时拉近镜头
         if (currentState === STATE.BUSY) {
-            minCamDist = 2.5;
-            maxCamDist = 5.0;
+            minCamDist = 1.5;
+            maxCamDist = 3.0;
         }
         
         if(camDist < minCamDist) {
              const dir = camera.position.clone().sub(controls.target).normalize();
-             camera.position.lerp(controls.target.clone().add(dir.multiplyScalar(minCamDist)), 0.1);
+             camera.position.lerp(controls.target.clone().add(dir.multiplyScalar(minCamDist)), 0.5);
         } else if(camDist > maxCamDist) {
              const dir = camera.position.clone().sub(controls.target).normalize();
-             camera.position.lerp(controls.target.clone().add(dir.multiplyScalar(maxCamDist)), 0.1);
+             camera.position.lerp(controls.target.clone().add(dir.multiplyScalar(maxCamDist)), 0.5);
         }
         
+        {
+            let nearest=null, minD=Infinity;
+            for(let i=0;i<ponds.length;i++){
+                const p=ponds[i];
+                const d=controls.target.distanceTo(p.position);
+                if(d<minD){minD=d;nearest=p;}
+            }
+            if(nearest){
+                const angleToPond=Math.atan2(nearest.position.x - controls.target.x, nearest.position.z - controls.target.z);
+                if(typeof controls.getAzimuthalAngle==='function' && typeof controls.rotateLeft==='function'){
+                    let az=controls.getAzimuthalAngle();
+                    let diff=angleToPond - az;
+                    while(diff>Math.PI) diff-=Math.PI*2;
+                    while(diff<-Math.PI) diff+=Math.PI*2;
+                    const avoid=0.25;
+                    if(Math.abs(diff)<avoid){
+                        controls.rotateLeft(Math.sign(diff)*(avoid - Math.abs(diff)));
+                    }
+                }
+                const camVec=new THREE.Vector3(camera.position.x - nearest.position.x, 0, camera.position.z - nearest.position.z);
+                const distCam=camVec.length();
+                const minDist=nearest.radius + 1.2;
+                if(distCam<minDist){
+                    camVec.normalize().multiplyScalar(minDist);
+                    camera.position.x = nearest.position.x + camVec.x;
+                    camera.position.z = nearest.position.z + camVec.z;
+                }
+            }
+        }
         controls.update();
 
         renderer.render(scene, camera);
@@ -2264,6 +2871,9 @@
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
+    }
+    window.initThreeScene = initThreeScene;
+    if (window.THREE) { initThreeScene(); }
 </script>
 </body>
 </html>
