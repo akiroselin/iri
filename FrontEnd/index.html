@@ -479,7 +479,8 @@
         const type = currentPet;
         // Base Scale
         let baseScale = 1;
-        if(type === 'corgi') baseScale = 0.7; // Slightly larger than cat (0.6)
+        // Reduced Corgi Scale by 25% (0.7 -> 0.525)
+        if(type === 'corgi') baseScale = 0.525; 
         else baseScale = 0.6;
 
         // Apply body scale trait to the whole group for simplicity, 
@@ -547,7 +548,10 @@
     }
 
     // --- Backend Integration ---
-    const API_BASE = 'http://localhost:3000/api';
+    // Use relative path for production, absolute for local dev if separated
+    const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? (window.location.port === '3000' ? '/api' : 'http://localhost:3000/api')
+        : '/api';
     let currentUser = null;
 
     // Auth Logic
@@ -937,9 +941,15 @@
     controls.minDistance = 2; controls.maxDistance = 20;
     controls.maxPolarAngle = Math.PI / 2 - 0.05; 
     controls.target.set(0, 0.5, 0);
+    // Right-click rotation fix: OrbitControls needs enableRotate to be true for right mouse button to work.
+    // By default mouseButtons.RIGHT is THREE.MOUSE.PAN if not set, but we set it to ROTATE.
+    // The manual listener was toggling enableRotate which might conflict or be redundant.
+    // OrbitControls usually handles this automatically if mouseButtons are set correctly.
     controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
-    renderer.domElement.addEventListener('mousedown', (e) => { if(e.button===2) controls.enableRotate = true; });
-    window.addEventListener('mouseup', (e) => { if(e.button===2) controls.enableRotate = false; });
+    controls.enableRotate = true; // Always enabled, let mouseButtons control mapping
+    
+    // renderer.domElement.addEventListener('mousedown', (e) => { if(e.button===2) controls.enableRotate = true; });
+    // window.addEventListener('mouseup', (e) => { if(e.button===2) controls.enableRotate = false; });
 
     // --- 场景物体构建 ---
     const raycaster = new THREE.Raycaster();
@@ -951,7 +961,7 @@
     let currentState = STATE.IDLE;
     const targetPos = new THREE.Vector3();
     const dogPos = new THREE.Vector3(0, 0, 0); 
-    const dogSpeed = 0.04; 
+    const dogSpeed = 0.06; // Increased from 0.04
     const WORLD_RADIUS = 90;
 
     // --- 宠物构建系统 ---
@@ -1074,6 +1084,8 @@
             // Paws
             const paw = new THREE.Mesh(new THREE.SphereGeometry(0.08), matWhite);
             paw.position.set(0, -0.15, 0.05);
+            // Fix: Lift legs slightly so paws don't sink
+            legG.position.y += 0.13; 
             l.add(paw);
 
             legs.push(legG);
@@ -1166,32 +1178,36 @@
         const matPink = new THREE.MeshStandardMaterial({ color: 0xF48FB1 });
         const matBlack = new THREE.MeshStandardMaterial({ color: 0x111111 });
 
-        // Body
-        const body = new THREE.Mesh(new THREE.SphereGeometry(0.38 * traits.bodyScale, 32, 32), matGrey);
-        body.position.y = 0.42; body.scale.set(0.65, 0.8, 1.25); body.castShadow = true;
+        // Body - Slimmer and longer
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.35 * traits.bodyScale, 32, 32), matGrey);
+        // Reduced width (x) and height (y) scale for slimness, increased length (z)
+        // Shortened Z from 1.4 to 1.1 per request
+        body.position.y = 0.42; body.scale.set(0.55, 0.7, 1.1); body.castShadow = true;
         corgiBody.add(body);
         
-        // Belly patch
-        const belly = new THREE.Mesh(new THREE.SphereGeometry(0.28 * traits.bodyScale, 32, 32), matWhite);
-        belly.position.set(0, 0.30, 0.05); belly.scale.set(0.9, 0.6, 1.0);
+        // Belly patch - Adjusted for slimmer body
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(0.26 * traits.bodyScale, 32, 32), matWhite);
+        // Adjusted belly scale Z from 1.1 to 0.9
+        belly.position.set(0, 0.30, 0.05); belly.scale.set(0.8, 0.5, 0.9);
         corgiBody.add(belly);
 
         // Tail (Long)
-        tail = new THREE.Group(); tail.position.set(0, 0.5, -0.45);
-        const tMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.02, 0.5, 16), matGrey);
-        tMesh.rotation.x = 0.5; tMesh.position.set(0, 0.2, -0.1);
+        // Moved tail forward from -0.5 to -0.4 to match shorter body
+        tail = new THREE.Group(); tail.position.set(0, 0.5, -0.4); 
+        const tMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.015, 0.6, 16), matGrey); // Thinner tail
+        tMesh.rotation.x = 0.5; tMesh.position.set(0, 0.25, -0.1);
         tail.add(tMesh); corgiBody.add(tail);
 
         // Head
         corgiBody.add(headGroup); // Ensure headGroup is added!
-        const headR = 0.24 * traits.headScale;
-        headGroup.position.set(0, 0.65, 0.35);
+        const headR = 0.22 * traits.headScale; // Slightly smaller head
+        headGroup.position.set(0, 0.65, 0.4); // Adjusted position
         const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 32, 32), matGrey);
         head.castShadow = true; headGroup.add(head);
 
         // Chest fluff (white)
-        const chestFluffCat = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), matWhite);
-        chestFluffCat.position.set(0, 0.38, 0.18);
+        const chestFluffCat = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 16), matWhite);
+        chestFluffCat.position.set(0, 0.38, 0.22);
         corgiBody.add(chestFluffCat);
 
         // Ears (Pointy)
@@ -2251,7 +2267,7 @@ var maxTrunkTop = 2.5;
         const centerGeo = new THREE.CircleGeometry(0.04, 8);
         const stemGeo = new THREE.CylinderGeometry(0.02, 0.02, 1, 8); // Base height 1
 
-        const petalMat = new THREE.MeshBasicMaterial({side: THREE.DoubleSide, vertexColors: true}); 
+        const petalMat = new THREE.MeshBasicMaterial({side: THREE.DoubleSide}); // Removed vertexColors: true 
         const centerMat = new THREE.MeshBasicMaterial({color:0xFFEB3B});
         const stemMat = new THREE.MeshStandardMaterial({color:0x4CAF50, roughness:0.8});
 
@@ -2261,7 +2277,7 @@ var maxTrunkTop = 2.5;
 
         scene.add(flowerStemMesh); scene.add(flowerPetalMesh); scene.add(flowerCenterMesh);
         
-        const fColors = [0xFFFFFF, 0xFFC0CB, 0xFFB6C1]; 
+        const fColors = [0xFFFFFF, 0xFFC0CB]; // White and Pink only 
         const _fColor = new THREE.Color();
         const fDummy = new THREE.Object3D();
         
@@ -2549,7 +2565,8 @@ var maxTrunkTop = 2.5;
             
             let pIdx = 0;
             flowerInstances.forEach((f, i) => {
-                const sway = Math.sin(time*1.5 + i) * 0.05;
+                // Increased sway frequency and amplitude slightly for better visibility
+                const sway = Math.sin(time*2.5 + i) * 0.15;
                 const currentTheta = f.theta + sway;
                 
                 // Head matrix
@@ -2626,7 +2643,8 @@ var maxTrunkTop = 2.5;
             const dist = dogPos.distanceTo(targetPos);
             
             // Stop if close enough (prevents spinning)
-            if (dist < 0.3) {
+            // Reduced threshold from 0.3 to 0.05 to make it reach the exact center
+            if (dist < 0.05) {
                 currentState = STATE.IDLE; targetRing.visible = false;
                 legs.forEach(l=>l.rotation.x=0); corgiBody.position.y=0;
                 runStateStart = 0; lastRunDist = Infinity; lastDistDecreaseTime = 0;
@@ -2654,7 +2672,7 @@ var maxTrunkTop = 2.5;
                  });
             } 
                 // 2. 移动阶段 (Move Phase) - STRICTLY only when aligned
-            else if(dist > 0.1 && Math.abs(diff) <= 0.1) {
+            else if(dist > 0.1) { // Removed strict alignment check (Math.abs(diff) <= 0.1) to allow moving while turning
                 // corgiGroup.rotation.y = targetAngle; // Smooth turn handles this, no snap needed
                 
                 let currentSpeed = dogSpeed;
@@ -2679,9 +2697,9 @@ var maxTrunkTop = 2.5;
                     lastRunDist = dist;
                 }
 
-                let alignThresh = 0.999;
+                let alignThresh = 0.85; // Relaxed from 0.999 to allow smoother turns
                 if(time - lastDistDecreaseTime > 3) { // stuck fallback
-                    alignThresh = 0.95;
+                    alignThresh = 0.75;
                     currentSpeed *= 0.8;
                 }
                 if(align < alignThresh) { 
@@ -2721,6 +2739,13 @@ var maxTrunkTop = 2.5;
                     currentState = STATE.IDLE;
                     showThought("(过不去...)");
                     targetRing.visible = false;
+                    
+                    // FIX: Reset Animation Pose on Collision
+                    legs.forEach(l=>l.rotation.x=0); 
+                    corgiBody.position.y=0;
+                    if(tail) tail.rotation.z = 0;
+                    if(headGroup) headGroup.rotation.x = 0;
+
                     // Bounce back slightly
                     const bounce = dogPos.clone().sub(nextPos).normalize().multiplyScalar(0.5);
                     dogPos.add(bounce);
@@ -2741,16 +2766,34 @@ var maxTrunkTop = 2.5;
                         // legs.forEach(l => l.position.y = -0.1 + Math.abs(Math.sin(hopPhase))*0.08);
 
                     } else if(currentPet === 'cat') {
-                        const walkPhase = time * 8;
-                        const stepAmp = Math.min(0.5, Math.max(0.4, currentSpeed * 10));
+                        // Cat Walk: More fluid, less rigid sway
+                        const walkPhase = time * 10;
+                        const stepAmp = 0.5;
+                        
+                        // Shoulder/Hip Movement (Spine flexibility)
+                        corgiBody.rotation.z = Math.sin(walkPhase) * 0.05; // Gentle roll
+                        corgiBody.position.y = Math.abs(Math.sin(walkPhase*2)) * 0.03; // Less bounce
+
                         legs.forEach((leg, i) => {
-                            leg.rotation.x = Math.sin(walkPhase + (i%2===0?0:Math.PI)) * stepAmp;
+                            // Phase offset for cat gait (Diagonal pairs: LF+RH, RF+LH)
+                            // i: 0=FL, 1=FR, 2=BL, 3=BR
+                            // Standard trot: 0&3 move together, 1&2 move together
+                            const legPhase = (i === 0 || i === 3) ? 0 : Math.PI;
+                            
+                            // Upper Leg Swing
+                            leg.rotation.x = Math.sin(walkPhase + legPhase) * stepAmp;
+                            
+                            // Knee/Paw Bend (Simple articulation simulation)
+                            // If leg is moving back, bend it slightly? 
+                            // Actually just giving it a "lift" arc is better
+                            const lift = Math.max(0, Math.sin(walkPhase + legPhase));
+                            leg.position.y = 0.2 + (lift * 0.1); // Lift paw when moving forward
                         });
-                        corgiBody.position.y = Math.abs(Math.sin(walkPhase)) * Math.min(0.05, currentSpeed * 2.0);
-                        corgiBody.rotation.y += Math.sin(walkPhase)*Math.min(0.005, currentSpeed * 0.3);
+
+                        // Tail flows behind
                         if(tail) {
-                            tail.rotation.y = Math.sin(walkPhase * 0.5) * Math.min(0.3, currentSpeed * 10);
-                            tail.rotation.x = 0.25;
+                            tail.rotation.y = Math.sin(walkPhase * 0.5) * 0.2;
+                            tail.rotation.x = 0.2 + Math.cos(walkPhase) * 0.05;
                         }
 
             } else {
@@ -2769,6 +2812,18 @@ var maxTrunkTop = 2.5;
 
         } else {
             // Idle State Logic - Short Range Exploration
+            // Reset Pose Guard (Lerp to zero if not animating)
+            // Only if NOT doing specific animations (checking randomness mostly)
+            // But let's just force reset legs slowly if they are stuck
+            if(legs && legs.length > 0) {
+                 legs.forEach(l => {
+                     if(Math.abs(l.rotation.x) > 0.01) l.rotation.x *= 0.9;
+                     else l.rotation.x = 0;
+                 });
+            }
+            if(Math.abs(corgiBody.position.y) > 0.01) corgiBody.position.y *= 0.9;
+            else corgiBody.position.y = 0;
+
             if (ownerIdle && Math.random() < 0.002) {
                 const center = new THREE.Vector3(camera.position.x, 0, camera.position.z);
                 const angle = Math.random() * Math.PI * 2;
@@ -2801,35 +2856,50 @@ var maxTrunkTop = 2.5;
         corgiGroup.position.copy(dogPos);
         if(corgiBody.position.y < 0) corgiBody.position.y = 0;
         
-        // 相机跟随 & 距离保持
-        const targetCam = dogPos.clone().add(new THREE.Vector3(0, 0.6, 0));
-        controls.target.lerp(targetCam, 0.6);
+        // 相机跟随 (Only when moving or busy)
+        // Improved logic: Pan camera WITH the target to preserve viewing angle/height
+        // This prevents the camera from moving directly overhead when the pet moves
+        if (currentState !== STATE.IDLE) {
+            const desiredTarget = dogPos.clone().add(new THREE.Vector3(0, 0.6, 0));
+            
+            // Calculate how much the target moves this frame (smoothly)
+            const oldTarget = controls.target.clone();
+            // Use a lower lerp factor for smoother camera movement
+            const newTarget = oldTarget.clone().lerp(desiredTarget, 0.1); 
+            const delta = newTarget.clone().sub(oldTarget);
+            
+            // Apply same translation to camera position to maintain relative view
+            camera.position.add(delta);
+            controls.target.copy(newTarget);
+            
+            // Distance Constraints (Soft limits)
+            const camDist = camera.position.distanceTo(controls.target);
+            let minCamDist = 2.5; // Increased to ensure we don't get too close (overhead)
+            let maxCamDist = 5.0; // Allow seeing more context
+            
+            // 交互时拉近镜头 (Adjusted for +0.5 distance)
+            if (currentState === STATE.BUSY) {
+                minCamDist = 2.0;
+                maxCamDist = 3.5;
+            }
+            
+            // Only adjust if out of bounds, and do it gently
+            if(camDist < minCamDist) {
+                 const dir = camera.position.clone().sub(controls.target).normalize();
+                 camera.position.lerp(controls.target.clone().add(dir.multiplyScalar(minCamDist)), 0.1);
+            } else if(camDist > maxCamDist) {
+                 const dir = camera.position.clone().sub(controls.target).normalize();
+                 camera.position.lerp(controls.target.clone().add(dir.multiplyScalar(maxCamDist)), 0.1);
+            }
+        }
         
-        const camDist = camera.position.distanceTo(controls.target);
-        let minCamDist = 1.5; 
-        let maxCamDist = 3.0;
-        
-        // Limit Camera Height (Tree top max)
+        // Limit Camera Height (Tree top max) - Keep this constraint always active for safety
         if (camera.position.y > maxTrunkTop) camera.position.y = maxTrunkTop;
         if (camera.position.y < 0.5) camera.position.y = 0.5;
 
         // Limit Camera Angle (Pitch)
         controls.minPolarAngle = 0.1; // Don't look from directly above/below
         controls.maxPolarAngle = Math.PI / 2 - 0.1; // Don't go below ground
-
-        // 交互时拉近镜头
-        if (currentState === STATE.BUSY) {
-            minCamDist = 1.5;
-            maxCamDist = 3.0;
-        }
-        
-        if(camDist < minCamDist) {
-             const dir = camera.position.clone().sub(controls.target).normalize();
-             camera.position.lerp(controls.target.clone().add(dir.multiplyScalar(minCamDist)), 0.5);
-        } else if(camDist > maxCamDist) {
-             const dir = camera.position.clone().sub(controls.target).normalize();
-             camera.position.lerp(controls.target.clone().add(dir.multiplyScalar(maxCamDist)), 0.5);
-        }
         
         {
             let nearest=null, minD=Infinity;

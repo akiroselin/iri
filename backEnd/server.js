@@ -7,19 +7,32 @@ const authRoutes = require('./routes/auth');
 const chatRoutes = require('./routes/chat');
 const userRoutes = require('./routes/user');
 
+const path = require('path');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
+
+// Serve Static Frontend
+app.use(express.static(path.join(__dirname, '../FrontEnd')));
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/user', userRoutes);
 
+// Fallback to index.html for SPA
+// Exclude API requests and common static extensions to prevent returning HTML for missing files
+app.get(/(.*)/, (req, res) => {
+    if (req.path.startsWith('/api') || /\.(js|css|png|jpg|jpeg|gif|ico|svg)$/i.test(req.path)) {
+        return res.status(404).send('Not Found');
+    }
+    res.sendFile(path.join(__dirname, '../FrontEnd/index.html'));
+});
+
 const server = app.listen(PORT, () => {
-    console.log(`Backend server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
 
 server.on('error', (e) => {

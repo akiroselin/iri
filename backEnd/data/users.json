@@ -7,10 +7,10 @@
     "petConfig": {
       "type": "cat",
       "traits": {
-        "bodyScale": 0.9773251807813306,
-        "headScale": 0.9965441940977056,
-        "earScale": 1.026975142777854,
-        "legLen": 0.9334623044603366
+        "bodyScale": 1.00561751372065,
+        "headScale": 1.0325147026305093,
+        "earScale": 0.8701916055902539,
+        "legLen": 0.9353372713200029
       }
     }
   },
@@ -18,6 +18,14 @@
     "email": "demo@example.com",
     "password": "123456",
     "joinedAt": "2025-12-14T15:32:31.468Z",
+    "moodHistory": [],
+    "petConfig": null,
+    "schedule": []
+  },
+  {
+    "email": "deploytest@example.com",
+    "password": "123",
+    "joinedAt": "2025-12-15T04:52:57.876Z",
     "moodHistory": [],
     "petConfig": null,
     "schedule": []
