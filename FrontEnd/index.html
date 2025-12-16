@@ -225,6 +225,21 @@
         border-color: rgba(255, 255, 255, 0.9) transparent transparent transparent;
     }
     </style>
+    <style>
+        /* Pet Selection Modal */
+        .pet-select-container {
+            display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;
+        }
+        .pet-select-card {
+            background: rgba(255,255,255,0.9); padding: 20px; border-radius: 16px;
+            width: 120px; text-align: center; cursor: pointer;
+            border: 2px solid transparent; transition: all 0.3s;
+        }
+        .pet-select-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .pet-select-card.selected { border-color: #7E57C2; background: #EDE7F6; }
+        .pet-select-icon { font-size: 40px; margin-bottom: 10px; }
+        .pet-select-name { font-weight: bold; color: #555; }
+    </style>
 </head>
 <body oncontextmenu="return false;">
 
@@ -245,6 +260,30 @@
             <span id="toggle-text">还没有账号？</span>
             <span id="toggle-btn" onclick="toggleAuthMode()" style="text-decoration: underline; cursor: pointer; font-weight: bold; color: #E0F2F1;">立即注册</span>
         </div>
+    </div>
+</div>
+
+<div id="pet-selection-modal" class="modal-overlay" style="z-index: 600;">
+    <div class="modal-content" style="max-width: 500px; text-align: center;">
+        <div class="modal-header" style="justify-content: center;">
+            <div class="modal-title">选择你的伙伴</div>
+        </div>
+        <div style="margin: 20px 0; color: #666;">每个伙伴都是独一无二的，它将和你一起成长。</div>
+        <div class="pet-select-container">
+            <div class="pet-select-card" onclick="selectInitialPet('corgi', this)">
+                <div class="pet-select-icon">🐶</div>
+                <div class="pet-select-name">柯基</div>
+            </div>
+            <div class="pet-select-card" onclick="selectInitialPet('cat', this)">
+                <div class="pet-select-icon">🐱</div>
+                <div class="pet-select-name">小花猫</div>
+            </div>
+            <div class="pet-select-card" onclick="selectInitialPet('rabbit', this)">
+                <div class="pet-select-icon">🐰</div>
+                <div class="pet-select-name">小白兔</div>
+            </div>
+        </div>
+        <div id="confirm-pet-btn" class="btn-primary" style="margin: 20px auto 0; width: 150px; opacity: 0.5; pointer-events: none;" onclick="confirmInitialPet()">确定选择</div>
     </div>
 </div>
 
@@ -325,6 +364,13 @@
         <button class="btn-send" onclick="sendMessage()">➤</button>
     </div>
 </div>
+
+<div id="logout-btn" style="position: absolute; top: 20px; right: 20px; z-index: 400; background: rgba(255,255,255,0.4); padding: 8px 15px; border-radius: 20px; cursor: pointer; backdrop-filter: blur(5px); font-size: 13px; color: #555; transition: all 0.3s;" onclick="logout()">
+    退出登录
+</div>
+<style>
+    #logout-btn:hover { background: rgba(255,255,255,0.8); transform: translateY(-2px); }
+</style>
 
 <div id="activity-modal" class="modal-overlay">
     <div class="modal-content">
@@ -454,8 +500,68 @@
         };
     }
 
+    // --- Pet Selection System ---
+    let selectedPetType = null;
+    window.selectInitialPet = function(type, el) {
+        selectedPetType = type;
+        document.querySelectorAll('.pet-select-card').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        const btn = document.getElementById('confirm-pet-btn');
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+    }
+
+    window.confirmInitialPet = async function() {
+        if(!selectedPetType || !currentUser) return;
+        
+        let updates = {};
+
+        // Check if user selected the SAME pet type as saved
+        if(currentUser.petConfig && currentUser.petConfig.type === selectedPetType) {
+            // Restore saved pet (Keep growth)
+            restorePet(currentUser.petConfig);
+            document.getElementById('pet-selection-modal').style.display = 'none';
+            showToast(`欢迎回来，你的${selectedPetType==='corgi'?'柯基':selectedPetType==='cat'?'小猫':'兔子'}一直在等你。`);
+            return; // No DB update needed
+        } else {
+            // New Pet Type Selected -> Reset Growth & Traits
+            // Randomize initial size (0.8 ~ 1.2)
+            const sizeMult = 0.8 + Math.random() * 0.4;
+            updates = {
+                petConfig: { type: selectedPetType, traits: generatePetTraits() },
+                petGrowth: { level: 1, exp: 0, sizeMultiplier: sizeMult }
+            };
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/user/update`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ email: currentUser.email, updates })
+            });
+            if(res.ok) {
+                currentUser = { ...currentUser, ...updates };
+                document.getElementById('pet-selection-modal').style.display = 'none';
+                restorePet(currentUser.petConfig);
+                showToast(`领养成功！你的${selectedPetType==='corgi'?'柯基':selectedPetType==='cat'?'小猫':'兔子'}来了。`);
+            } else {
+                showToast("保存失败，请重试");
+            }
+        } catch(e) {
+            console.error(e);
+            showToast("网络错误");
+        }
+    }
+
     window.restorePet = function(config) {
         if(!config || !config.type) return;
+        
+        // Hide selector if fixed pet
+        if(currentUser && currentUser.petConfig) {
+             const selector = document.getElementById('pet-selector');
+             if(selector) selector.style.display = 'none';
+        }
+
         const allowed = ['corgi','rabbit','cat'];
         currentPet = allowed.includes(config.type) ? config.type : 'corgi';
         if(!window.THREE || !window.corgiGroup){
@@ -483,6 +589,11 @@
         if(type === 'corgi') baseScale = 0.525; 
         else baseScale = 0.6;
 
+        // --- Growth Logic ---
+        if(currentUser && currentUser.petGrowth && currentUser.petGrowth.sizeMultiplier) {
+             baseScale *= currentUser.petGrowth.sizeMultiplier;
+        }
+
         // Apply body scale trait to the whole group for simplicity, 
         // or we can pass traits to create functions for more detail.
         // Let's pass traits to create functions implicitly via corgiGroup.userData.traits
@@ -495,9 +606,24 @@
         else if(type === 'cat' && window.createCat) window.createCat();
         else if(window.createCorgi) window.createCorgi();
         
-        // Reset position
+        // Reset position (Default)
+        window.dogPos.set(0,0,0);
+        window.corgiGroup.position.set(0,0,0);
         window.corgiBody.position.set(0,0,0);
         window.corgiBody.rotation.set(0,0,0);
+        
+        // Restore Last Position if available
+        if(currentUser && currentUser.lastPosition) {
+            const lp = currentUser.lastPosition;
+            if(typeof lp.x === 'number' && typeof lp.z === 'number') {
+                window.dogPos.set(lp.x, lp.y||0, lp.z);
+                window.corgiGroup.position.set(lp.x, lp.y||0, lp.z);
+                if(typeof lp.rot === 'number') window.corgiGroup.rotation.y = lp.rot;
+            }
+        }
+
+        // Re-attach props (Food, Comb, Toy) to the new pet model
+        if(typeof attachPropsToPet === 'function') attachPropsToPet();
     }
 
     function removeScheduleItem(index) {
@@ -556,6 +682,39 @@
 
     // Auth Logic
     let isRegister = false;
+
+    window.logout = async function() {
+        if(!confirm('确定要退出登录吗？')) return;
+        
+        // Save current position state before logout
+        if(currentUser && window.corgiGroup) {
+            try {
+                const pos = window.dogPos || window.corgiGroup.position;
+                const rot = window.corgiGroup.rotation.y;
+                await fetch(`${API_BASE}/user/update`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        email: currentUser.email, 
+                        updates: { 
+                            lastPosition: { x: pos.x, y: pos.y, z: pos.z, rot: rot } 
+                        } 
+                    })
+                });
+            } catch(e) { console.error("Save pos failed", e); }
+        }
+
+        currentUser = null;
+        document.getElementById('login-modal').style.display = 'flex';
+        // Clear scene or just reset?
+        // Resetting schedule and chat
+        document.getElementById('chat-history').innerHTML = '';
+        schedule.length = 0;
+        renderScheduleUI();
+        // Hide UI
+        document.getElementById('pet-selection-modal').style.display = 'none';
+        showToast("已退出登录");
+    }
     
     function toggleAuthMode() {
         isRegister = !isRegister;
@@ -637,8 +796,15 @@
             petStatus.gloss = 75;
             updateStatusUI();
 
-            if(window.THREE && typeof restorePet==='function' && currentUser.petConfig){
-                restorePet(currentUser.petConfig);
+            if(window.THREE && typeof restorePet==='function'){
+                if(currentUser.petConfig && currentUser.petConfig.type) {
+                    // User has a pet -> Restore directly
+                    restorePet(currentUser.petConfig);
+                } else {
+                    // User has NO pet (New User) -> Show Selection Modal
+                    const m = document.getElementById('pet-selection-modal');
+                    if(m) m.style.display = 'flex';
+                }
             } else if(window.THREE && typeof selectPet==='function'){
                 selectPet('corgi');
             }
@@ -960,7 +1126,8 @@
     const STATE = { IDLE: 0, RUN: 1, BELLY: 2, BUSY: 3 };
     let currentState = STATE.IDLE;
     const targetPos = new THREE.Vector3();
-    const dogPos = new THREE.Vector3(0, 0, 0); 
+    window.dogPos = new THREE.Vector3(0, 0, 0);
+    const dogPos = window.dogPos;
     const dogSpeed = 0.06; // Increased from 0.04
     const WORLD_RADIUS = 90;
 
@@ -1273,8 +1440,11 @@
     window.interact = function(type) {
         lastOwnerInteractionTime = Date.now() * 0.001;
         didWanderAfterOwnerIdle = false;
-        if (currentState !== STATE.IDLE) return; // 忙碌中
-        currentState = STATE.BUSY; // 锁定状态
+        
+        // Force interrupt any current state
+        currentState = STATE.BUSY; 
+        targetRing.visible = false;
+        runStateStart = 0;
 
         // 1. 更新数值 & 提示
         if (type === 'feed') {
@@ -2277,7 +2447,7 @@ var maxTrunkTop = 2.5;
 
         scene.add(flowerStemMesh); scene.add(flowerPetalMesh); scene.add(flowerCenterMesh);
         
-        const fColors = [0xFFFFFF, 0xFFC0CB]; // White and Pink only 
+        const fColors = [0xFFFFFF, 0xFFC0CB, 0xFFC0CB, 0xFF69B4]; // White and more Pinks 
         const _fColor = new THREE.Color();
         const fDummy = new THREE.Object3D();
         
@@ -2362,11 +2532,12 @@ var maxTrunkTop = 2.5;
         // 1. Stars (Night only)
         const starGeo = new THREE.BufferGeometry();
         const starPos = [];
-        for(let i=0; i<1000; i++) {
-            starPos.push((Math.random()-0.5)*600, 300 + Math.random()*300, (Math.random()-0.5)*600);
+        for(let i=0; i<1500; i++) {
+            // Spread stars wider and lower to be visible in camera view
+            starPos.push((Math.random()-0.5)*800, 50 + Math.random()*400, (Math.random()-0.5)*800);
         }
         starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-        stars = new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xFFFFFF, size: 0.35, transparent: true, opacity: 0, depthTest: true}));
+        stars = new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xFFFFFF, size: 0.8, transparent: true, opacity: 0, depthWrite: false}));
         scene.add(stars);
 
         // 2. Fireflies (Night only)
@@ -2489,19 +2660,26 @@ var maxTrunkTop = 2.5;
             if(stars) stars.material.opacity = 0;
         } else if(t >= 0.7 && t < 0.8) { // Sunset (5pm-7pm)
             const p = (t-0.7)/0.1;
-            skyColor = new THREE.Color().lerpColors(new THREE.Color(0xE0F2F1), new THREE.Color(0xFFAB91), p);
+            // Purple-Red Gradient: From Golden-Day to Deep Purple-Red
+            // Start: 0xE0F2F1 (Cyan) -> End: 0x880E4F (Deep Pink/Purple) mixed with 0xFF5252
+            // Let's use a nice sunset gradient
+            skyColor = new THREE.Color().lerpColors(new THREE.Color(0xFFCC80), new THREE.Color(0x6A1B9A), p);
+            
             groundColor = new THREE.Color(0x33691E);
-            sunColor = new THREE.Color(0xFF9800);
-            sunIntensity = 1.0 - p*0.5;
-            fogColor = new THREE.Color().lerpColors(new THREE.Color(0xE0F7FA), new THREE.Color(0xFFCC80), p);
+            sunColor = new THREE.Color(0xFFD700); // Intense Gold
+            sunIntensity = 1.2 - p*0.3; 
+            
+            // Golden Fog: Glowing atmosphere
+            fogColor = new THREE.Color().lerpColors(new THREE.Color(0xFFECB3), new THREE.Color(0xFFD54F), p);
+            
             if(stars) stars.material.opacity = p;
         } else { // Night (7pm-6am)
-            skyColor = new THREE.Color(0x1A237E);
+            skyColor = new THREE.Color(0x0D1B2A); // Deep Night Blue
             groundColor = new THREE.Color(0x000000);
             sunColor = new THREE.Color(0x5C6BC0); // Moon
-            sunIntensity = 0.3;
-            fogColor = new THREE.Color(0x1A237E);
-            if(stars) stars.material.opacity = 0.8;
+            sunIntensity = 0.2;
+            fogColor = new THREE.Color(0x0D1B2A);
+            if(stars) stars.material.opacity = 0.9; // High visibility
         }
 
         hemiLight.color.copy(skyColor);
@@ -2645,8 +2823,22 @@ var maxTrunkTop = 2.5;
             // Stop if close enough (prevents spinning)
             // Reduced threshold from 0.3 to 0.05 to make it reach the exact center
             if (dist < 0.05) {
-                currentState = STATE.IDLE; targetRing.visible = false;
-                legs.forEach(l=>l.rotation.x=0); corgiBody.position.y=0;
+                currentState = STATE.IDLE; 
+                if(targetRing) targetRing.visible = false; // Hide ring on arrival
+                legs.forEach(l => { 
+                    l.rotation.x = 0; 
+                    if(currentPet === 'rabbit') l.position.y = 0.28;
+                    else if(currentPet === 'corgi') l.position.y = 0.25;
+                    else l.position.y = 0.2; // Cat
+                }); 
+                corgiBody.position.y=0;
+                corgiBody.rotation.z=0;
+                if(tail) { 
+                    tail.rotation.y=0; 
+                    tail.rotation.z=0;
+                    if(currentPet === 'cat') tail.rotation.x = 0.2;
+                    else tail.rotation.x = 0;
+                }
                 runStateStart = 0; lastRunDist = Infinity; lastDistDecreaseTime = 0;
                 return;
             }
@@ -2672,7 +2864,7 @@ var maxTrunkTop = 2.5;
                  });
             } 
                 // 2. 移动阶段 (Move Phase) - STRICTLY only when aligned
-            else if(dist > 0.1) { // Removed strict alignment check (Math.abs(diff) <= 0.1) to allow moving while turning
+            else if(dist > 0.05) {  // Changed from 0.1 to 0.05 to match stop condition
                 // corgiGroup.rotation.y = targetAngle; // Smooth turn handles this, no snap needed
                 
                 let currentSpeed = dogSpeed;
@@ -2710,6 +2902,23 @@ var maxTrunkTop = 2.5;
                 const step = forward.clone().multiplyScalar(currentSpeed);
                 if(step.dot(desired) <= 0) return;
                 const nextPos = dogPos.clone().add(step);
+                
+                // Extra check: if step would overshoot destination (very close)
+                if(nextPos.distanceTo(targetPos) < 0.05) {
+                    currentState = STATE.IDLE;
+                    if(targetRing) targetRing.visible = false;
+                    legs.forEach(l => { 
+                        l.rotation.x = 0; 
+                        if(currentPet === 'rabbit') l.position.y = 0.28;
+                        else if(currentPet === 'corgi') l.position.y = 0.25;
+                        else l.position.y = 0.2; 
+                    }); 
+                    corgiBody.position.y=0;
+                    corgiBody.rotation.z=0;
+                    runStateStart = 0; lastRunDist = Infinity; lastDistDecreaseTime = 0;
+                    dogPos.copy(targetPos); // Snap to target
+                    return;
+                }
 
                 // Collision (Trees & Ponds)
                 let collision = false;
@@ -2741,9 +2950,20 @@ var maxTrunkTop = 2.5;
                     targetRing.visible = false;
                     
                     // FIX: Reset Animation Pose on Collision
-                    legs.forEach(l=>l.rotation.x=0); 
+                    legs.forEach(l => { 
+                        l.rotation.x = 0; 
+                        if(currentPet === 'rabbit') l.position.y = 0.28;
+                        else if(currentPet === 'corgi') l.position.y = 0.25;
+                        else l.position.y = 0.2; 
+                    }); 
                     corgiBody.position.y=0;
-                    if(tail) tail.rotation.z = 0;
+                    corgiBody.rotation.z=0;
+                    if(tail) { 
+                        tail.rotation.y=0; 
+                        tail.rotation.z=0;
+                        if(currentPet === 'cat') tail.rotation.x = 0.2;
+                        else tail.rotation.x = 0;
+                    }
                     if(headGroup) headGroup.rotation.x = 0;
 
                     // Bounce back slightly
@@ -2812,17 +3032,33 @@ var maxTrunkTop = 2.5;
 
         } else {
             // Idle State Logic - Short Range Exploration
-            // Reset Pose Guard (Lerp to zero if not animating)
-            // Only if NOT doing specific animations (checking randomness mostly)
-            // But let's just force reset legs slowly if they are stuck
+            // Reset Pose Guard (Force exact reset if close enough)
             if(legs && legs.length > 0) {
                  legs.forEach(l => {
-                     if(Math.abs(l.rotation.x) > 0.01) l.rotation.x *= 0.9;
-                     else l.rotation.x = 0;
+                     // Force reset legs if they are still moving or not aligned
+                     if(Math.abs(l.rotation.x) > 0.001) {
+                         l.rotation.x *= 0.8; // Faster decay
+                     } else {
+                         l.rotation.x = 0;
+                     }
+                     
+                     // Reset height
+                     let targetY = 0;
+                     if(currentPet === 'rabbit') targetY = 0.28;
+                     else if(currentPet === 'corgi') targetY = 0.25;
+                     else targetY = 0.2; // Cat
+                     
+                     if(Math.abs(l.position.y - targetY) > 0.001) {
+                         l.position.y = THREE.MathUtils.lerp(l.position.y, targetY, 0.2);
+                     } else {
+                         l.position.y = targetY;
+                     }
                  });
             }
-            if(Math.abs(corgiBody.position.y) > 0.01) corgiBody.position.y *= 0.9;
+            if(Math.abs(corgiBody.position.y) > 0.001) corgiBody.position.y *= 0.8;
             else corgiBody.position.y = 0;
+            if(Math.abs(corgiBody.rotation.z) > 0.001) corgiBody.rotation.z *= 0.8;
+            else corgiBody.rotation.z = 0;
 
             if (ownerIdle && Math.random() < 0.002) {
                 const center = new THREE.Vector3(camera.position.x, 0, camera.position.z);

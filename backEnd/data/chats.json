@@ -293,5 +293,30 @@
       }
     ],
     "timestamp": "2025-12-05T13:58:29.292Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "今天有点累",
+    "timestamp": "2025-12-15T12:11:22.191Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "看起来你最近承担了很多。请允许自己停下来休息一会儿，你已经做得很好了。抱抱自己。",
+    "weather": "night",
+    "activities": [
+      {
+        "title": "冥想放松",
+        "time": "20:00-20:30",
+        "desc": "放空大脑，专注呼吸。"
+      },
+      {
+        "title": "温暖沐浴",
+        "time": "21:00-21:30",
+        "desc": "热水澡能缓解疲劳。"
+      }
+    ],
+    "timestamp": "2025-12-15T12:11:27.196Z"
   }
 ]

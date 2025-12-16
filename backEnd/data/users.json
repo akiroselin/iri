@@ -5,13 +5,24 @@
     "moodHistory": [],
     "password": "linxintan",
     "petConfig": {
-      "type": "cat",
+      "type": "corgi",
       "traits": {
-        "bodyScale": 1.00561751372065,
-        "headScale": 1.0325147026305093,
-        "earScale": 0.8701916055902539,
-        "legLen": 0.9353372713200029
+        "bodyScale": 0.9916239475130469,
+        "headScale": 0.9213233458284265,
+        "earScale": 1.0891705658968218,
+        "legLen": 1.0329218027644345
       }
+    },
+    "petGrowth": {
+      "level": 1,
+      "exp": 0,
+      "sizeMultiplier": 1.0057281261358253
+    },
+    "lastPosition": {
+      "x": -8.591657032638121,
+      "y": 1.2090030426135196e-15,
+      "z": -5.444865652204043,
+      "rot": 5.401728949131942
     }
   },
   {

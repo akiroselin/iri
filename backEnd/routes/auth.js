@@ -42,6 +42,7 @@ router.post('/register', (req, res) => {
         joinedAt: new Date().toISOString(),
         moodHistory: [],
         petConfig: null,
+        petGrowth: { level: 1, exp: 0, sizeMultiplier: 1.0 },
         schedule: []
     };
     db.saveUser(user);
