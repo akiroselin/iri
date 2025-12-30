@@ -318,5 +318,425 @@
       }
     ],
     "timestamp": "2025-12-15T12:11:27.196Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "有点累",
+    "timestamp": "2025-12-18T03:32:33.518Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "看起来你最近承担了很多。请允许自己停下来休息一会儿，你已经做得很好了。抱抱自己。",
+    "weather": "night",
+    "activities": [
+      {
+        "title": "冥想放松",
+        "time": "20:00-20:30",
+        "desc": "放空大脑，专注呼吸。"
+      },
+      {
+        "title": "温暖沐浴",
+        "time": "21:00-21:30",
+        "desc": "热水澡能缓解疲劳。"
+      }
+    ],
+    "timestamp": "2025-12-18T03:32:38.522Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "很想去玩",
+    "timestamp": "2025-12-18T03:32:52.972Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "我听到了你的心声。生活总会有起伏，试着深呼吸，感受当下的平静。",
+    "weather": "sunset",
+    "activities": [
+      {
+        "title": "冥想放松",
+        "time": "20:00-20:30",
+        "desc": "放空大脑，专注呼吸。"
+      },
+      {
+        "title": "温暖沐浴",
+        "time": "21:00-21:30",
+        "desc": "热水澡能缓解疲劳。"
+      }
+    ],
+    "timestamp": "2025-12-18T03:32:57.975Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "今天好开心",
+    "timestamp": "2025-12-18T04:42:36.478Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "真棒！隔着屏幕都感受到了你的喜悦。一定要好好享受这个时刻！",
+    "weather": "sunny",
+    "activities": [
+      {
+        "title": "记录美好",
+        "time": "Now",
+        "desc": "拍照或写下来，留住此刻。"
+      },
+      {
+        "title": "奖励自己",
+        "time": "Now",
+        "desc": "吃顿好的，或者买个小礼物。"
+      }
+    ],
+    "timestamp": "2025-12-18T04:42:41.483Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "今天有点厌食",
+    "timestamp": "2025-12-18T04:43:06.701Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "我听到了你的心声。生活总会有起伏，试着深呼吸，感受当下的平静。",
+    "weather": "sunset",
+    "activities": [],
+    "timestamp": "2025-12-18T04:43:11.702Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "今天非常烦躁",
+    "timestamp": "2025-12-18T04:43:18.705Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "感受到你心里的火气了。这种时候，把情绪发泄出来或者转移注意力都是好的。",
+    "weather": "rain",
+    "activities": [
+      {
+        "title": "剧烈运动",
+        "time": "Now",
+        "desc": "做几个开合跳，释放压力。"
+      },
+      {
+        "title": "深呼吸",
+        "time": "Now",
+        "desc": "吸气4秒，憋气7秒，呼气8秒。"
+      }
+    ],
+    "timestamp": "2025-12-18T04:43:23.707Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "非常想睡觉",
+    "timestamp": "2025-12-18T04:45:16.036Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "我听到了你的心声。生活总会有起伏，试着深呼吸，感受当下的平静。",
+    "weather": "sunset",
+    "activities": [],
+    "timestamp": "2025-12-18T04:45:21.037Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我非常气愤",
+    "timestamp": "2025-12-18T09:49:38.630Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "感受到你心里的火气了。这种时候，把情绪发泄出来或者转移注意力都是好的。",
+    "weather": "rain",
+    "activities": [
+      {
+        "title": "剧烈运动",
+        "time": "Now",
+        "desc": "做几个开合跳，释放压力。"
+      },
+      {
+        "title": "深呼吸",
+        "time": "Now",
+        "desc": "吸气4秒，憋气7秒，呼气8秒。"
+      }
+    ],
+    "timestamp": "2025-12-18T09:49:43.633Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我想哭",
+    "timestamp": "2025-12-18T09:49:50.479Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "抱抱你。允许自己悲伤一会儿，这没关系。我会一直在这里陪着你。",
+    "weather": "rain",
+    "activities": [
+      {
+        "title": "温暖热饮",
+        "time": "Now",
+        "desc": "一杯热可可或热牛奶。"
+      },
+      {
+        "title": "看部治愈电影",
+        "time": "20:00-22:00",
+        "desc": "比如《龙猫》或《小森林》。"
+      }
+    ],
+    "timestamp": "2025-12-18T09:49:55.481Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我失恋了",
+    "timestamp": "2025-12-18T09:50:02.279Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "我听到了你的心声。生活总会有起伏，试着深呼吸，感受当下的平静。",
+    "weather": "sunset",
+    "activities": [],
+    "timestamp": "2025-12-18T09:50:07.281Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我感觉很悲伤",
+    "timestamp": "2025-12-18T09:50:16.647Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "我听到了你的心声。生活总会有起伏，试着深呼吸，感受当下的平静。",
+    "weather": "sunset",
+    "activities": [],
+    "timestamp": "2025-12-18T09:50:21.649Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我感觉有点无聊",
+    "timestamp": "2025-12-18T09:50:51.643Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "无聊其实是创造力的开始。不如利用这段空白时间做点有趣的小事？",
+    "weather": "sunny",
+    "activities": [
+      {
+        "title": "读几页书",
+        "time": "Now",
+        "desc": "随手翻开一本书读5分钟。"
+      },
+      {
+        "title": "断舍离",
+        "time": "Now",
+        "desc": "扔掉3件不需要的物品。"
+      }
+    ],
+    "timestamp": "2025-12-18T09:50:56.645Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我想做瑜伽",
+    "timestamp": "2025-12-18T09:51:05.879Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "我听到了你的心声。生活总会有起伏，试着深呼吸，感受当下的平静。",
+    "weather": "sunset",
+    "activities": [],
+    "timestamp": "2025-12-18T09:51:10.881Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "今天好开心",
+    "timestamp": "2025-12-18T14:55:09.536Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "真棒！隔着屏幕都感受到了你的喜悦。一定要好好享受这个时刻！",
+    "weather": "sunny",
+    "activities": [
+      {
+        "title": "记录美好",
+        "time": "Now",
+        "desc": "拍照或写下来，留住此刻。"
+      },
+      {
+        "title": "奖励自己",
+        "time": "Now",
+        "desc": "吃顿好的，或者买个小礼物。"
+      }
+    ],
+    "timestamp": "2025-12-18T14:55:14.540Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我很开心",
+    "timestamp": "2025-12-19T02:17:08.675Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "真棒！隔着屏幕都感受到了你的喜悦。一定要好好享受这个时刻！",
+    "weather": "sunny",
+    "activities": [
+      {
+        "title": "记录美好",
+        "time": "Now",
+        "desc": "拍照或写下来，留住此刻。"
+      },
+      {
+        "title": "奖励自己",
+        "time": "Now",
+        "desc": "吃顿好的，或者买个小礼物。"
+      }
+    ],
+    "timestamp": "2025-12-19T02:17:13.678Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我很开心",
+    "timestamp": "2025-12-19T02:18:20.759Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "真棒！隔着屏幕都感受到了你的喜悦。一定要好好享受这个时刻！",
+    "weather": "sunny",
+    "activities": [
+      {
+        "title": "记录美好",
+        "time": "Now",
+        "desc": "拍照或写下来，留住此刻。"
+      },
+      {
+        "title": "奖励自己",
+        "time": "Now",
+        "desc": "吃顿好的，或者买个小礼物。"
+      }
+    ],
+    "timestamp": "2025-12-19T02:18:25.762Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "今天很开心",
+    "timestamp": "2025-12-19T03:05:20.673Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "真棒！隔着屏幕都感受到了你的喜悦。一定要好好享受这个时刻！",
+    "weather": "sunny",
+    "activities": [
+      {
+        "title": "记录美好",
+        "time": "Now",
+        "desc": "拍照或写下来，留住此刻。"
+      },
+      {
+        "title": "奖励自己",
+        "time": "Now",
+        "desc": "吃顿好的，或者买个小礼物。"
+      }
+    ],
+    "timestamp": "2025-12-19T03:05:25.676Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我有点累",
+    "timestamp": "2025-12-19T03:06:11.398Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "听起来你真的需要充电了。别硬撑，现在的任务就是好好休息。",
+    "weather": "night",
+    "activities": [
+      {
+        "title": "热水澡",
+        "time": "21:00-21:30",
+        "desc": "洗去一身的疲惫。"
+      },
+      {
+        "title": "白噪音冥想",
+        "time": "22:00-22:15",
+        "desc": "听着雨声入睡。"
+      }
+    ],
+    "timestamp": "2025-12-19T03:06:16.400Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我很开心",
+    "timestamp": "2025-12-19T14:40:02.507Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "真棒！隔着屏幕都感受到了你的喜悦。一定要好好享受这个时刻！",
+    "weather": "sunny",
+    "activities": [
+      {
+        "title": "记录美好",
+        "time": "Now",
+        "desc": "拍照或写下来，留住此刻。"
+      },
+      {
+        "title": "奖励自己",
+        "time": "Now",
+        "desc": "吃顿好的，或者买个小礼物。"
+      }
+    ],
+    "timestamp": "2025-12-19T14:40:07.509Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "user",
+    "text": "我很开心",
+    "timestamp": "2025-12-29T04:55:56.064Z"
+  },
+  {
+    "userEmail": "amy881225@gmail.com",
+    "sender": "ai",
+    "text": "真棒！隔着屏幕都感受到了你的喜悦。一定要好好享受这个时刻！",
+    "weather": "sunny",
+    "activities": [
+      {
+        "title": "记录美好",
+        "time": "Now",
+        "desc": "拍照或写下来，留住此刻。"
+      },
+      {
+        "title": "奖励自己",
+        "time": "Now",
+        "desc": "吃顿好的，或者买个小礼物。"
+      }
+    ],
+    "timestamp": "2025-12-29T04:56:01.072Z"
   }
 ]

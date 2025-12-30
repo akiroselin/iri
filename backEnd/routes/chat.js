@@ -15,15 +15,79 @@ const PET_PERSONALITY_DESC = {
 function mockGeminiResponse(text, petType) {
     let reply = "我听到了你的心声。生活总会有起伏，试着深呼吸，感受当下的平静。";
     let weather = "sunset";
-    let activities = [
-        { title: "冥想放松", time: "20:00-20:30", desc: "放空大脑，专注呼吸。" },
-        { title: "温暖沐浴", time: "21:00-21:30", desc: "热水澡能缓解疲劳。" }
-    ];
+    let activities = [];
     
     const petNames = { buffalo: "水牛", corgi: "柯基", rabbit: "小白兔", cat: "小猫" };
     const pName = petNames[petType] || "宠物";
 
-    // 1. 宠物相关问题
+    // Emotion & Activity Mapping
+    const emotions = [
+        {
+            keywords: ["累", "疲惫", "倦", "耗尽", "不动"],
+            reply: "听起来你真的需要充电了。别硬撑，现在的任务就是好好休息。",
+            weather: "night",
+            activities: [
+                { title: "热水澡", time: "21:00-21:30", desc: "洗去一身的疲惫。" },
+                { title: "白噪音冥想", time: "22:00-22:15", desc: "听着雨声入睡。" }
+            ]
+        },
+        {
+            keywords: ["烦", "生气", "火", "气", "讨厌", "躁"],
+            reply: "感受到你心里的火气了。这种时候，把情绪发泄出来或者转移注意力都是好的。",
+            weather: "rain", // Rain usually cools down
+            activities: [
+                { title: "剧烈运动", time: "Now", desc: "做几个开合跳，释放压力。" },
+                { title: "深呼吸", time: "Now", desc: "吸气4秒，憋气7秒，呼气8秒。" }
+            ]
+        },
+        {
+            keywords: ["焦虑", "担心", "怕", "压力", "慌", "紧张"],
+            reply: "焦虑像一团乱麻，我们慢慢来解开。先关注当下这一刻，不要去想还没发生的事。",
+            weather: "sunset",
+            activities: [
+                { title: "书写忧虑", time: "Now", desc: "把担心的事写下来，然后划掉。" },
+                { title: "整理桌面", time: "Now", desc: "整理外部环境也能整理内心。" }
+            ]
+        },
+        {
+            keywords: ["难过", "伤心", "哭", "抑郁", "丧", "痛苦"],
+            reply: "抱抱你。允许自己悲伤一会儿，这没关系。我会一直在这里陪着你。",
+            weather: "rain",
+            activities: [
+                { title: "温暖热饮", time: "Now", desc: "一杯热可可或热牛奶。" },
+                { title: "看部治愈电影", time: "20:00-22:00", desc: "比如《龙猫》或《小森林》。" }
+            ]
+        },
+        {
+            keywords: ["孤独", "寂寞", "没人", "空虚"],
+            reply: `你不是一个人，${pName}正看着你呢。有时候独处也是一种享受，但如果感到孤单，试着建立一点连接。`,
+            weather: "night",
+            activities: [
+                { title: "给朋友发消息", time: "Now", desc: "哪怕只是发个表情包。" },
+                { title: "与宠物互动", time: "Now", desc: "摸摸它的头，给它喂点好吃的。" }
+            ]
+        },
+        {
+            keywords: ["无聊", "没劲", "闲", "没事"],
+            reply: "无聊其实是创造力的开始。不如利用这段空白时间做点有趣的小事？",
+            weather: "sunny",
+            activities: [
+                { title: "读几页书", time: "Now", desc: "随手翻开一本书读5分钟。" },
+                { title: "断舍离", time: "Now", desc: "扔掉3件不需要的物品。" }
+            ]
+        },
+        {
+            keywords: ["开心", "高兴", "快乐", "棒", "顺", "爽", "好"],
+            reply: "真棒！隔着屏幕都感受到了你的喜悦。一定要好好享受这个时刻！",
+            weather: "sunny",
+            activities: [
+                { title: "记录美好", time: "Now", desc: "拍照或写下来，留住此刻。" },
+                { title: "奖励自己", time: "Now", desc: "吃顿好的，或者买个小礼物。" }
+            ]
+        }
+    ];
+
+    // 1. Check for Pet Interaction first
     if (text.includes("它") || text.includes("宠物") || text.includes("狗") || text.includes("牛") || text.includes("兔") || text.includes("猫")) {
         if(text.includes("喜欢")) {
             reply = `${pName}最喜欢你的陪伴了，当然还有美味的零食和舒服的抚摸。`;
@@ -34,17 +98,17 @@ function mockGeminiResponse(text, petType) {
         }
         weather = "sunny";
         activities = []; 
+        return { reply, activities, weather };
     }
-    // 2. 心情/读心
-    else if (text.includes("累") || text.includes("烦") || text.includes("难过") || text.includes("压力")) {
-        reply = "看起来你最近承担了很多。请允许自己停下来休息一会儿，你已经做得很好了。抱抱自己。";
-        weather = "night";
-    } else if (text.includes("开心") || text.includes("好") || text.includes("棒") || text.includes("顺")) {
-        reply = "真为你感到高兴！保持这种积极的状态，世界也会变得明亮起来。";
-        weather = "sunny";
-        activities = [{ title: "记录美好", time: "Now", desc: "写下此刻的开心瞬间。" }];
-    } else if (text.includes("无聊") || text.includes("没事")) {
-        reply = `有时候无聊也是一种放松。不如观察一下${pName}，或者读一本一直想读的书？`;
+
+    // 2. Check Emotions
+    for (const emotion of emotions) {
+        if (emotion.keywords.some(k => text.includes(k))) {
+            reply = emotion.reply;
+            weather = emotion.weather;
+            activities = emotion.activities;
+            return { reply, activities, weather };
+        }
     }
 
     return { reply, activities, weather };

@@ -1,1 +1,15 @@
-{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "backEnd/server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/backEnd/server.js"
+    }
+  ]
+}

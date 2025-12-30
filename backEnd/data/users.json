@@ -19,10 +19,10 @@
       "sizeMultiplier": 1.0057281261358253
     },
     "lastPosition": {
-      "x": -8.591657032638121,
-      "y": 1.2090030426135196e-15,
-      "z": -5.444865652204043,
-      "rot": 5.401728949131942
+      "x": -9.385140715635538,
+      "y": -2.7567310476610605e-15,
+      "z": 12.415212919007029,
+      "rot": -0.4660497595460248
     }
   },
   {
@@ -39,6 +39,19 @@
     "joinedAt": "2025-12-15T04:52:57.876Z",
     "moodHistory": [],
     "petConfig": null,
+    "schedule": []
+  },
+  {
+    "email": "test_1767096808985@example.com",
+    "password": "pw123",
+    "joinedAt": "2025-12-30T12:13:29.012Z",
+    "moodHistory": [],
+    "petConfig": null,
+    "petGrowth": {
+      "level": 1,
+      "exp": 0,
+      "sizeMultiplier": 1
+    },
     "schedule": []
   }
 ]

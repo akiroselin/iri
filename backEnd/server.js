@@ -31,10 +31,16 @@ app.get(/(.*)/, (req, res) => {
     res.sendFile(path.join(__dirname, '../FrontEnd/index.html'));
 });
 
-const server = app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+// Export for Vercel/Serverless
+module.exports = app;
 
-server.on('error', (e) => {
-    console.error('Server error:', e);
-});
+// Only listen if run directly
+if (require.main === module) {
+    const server = app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+
+    server.on('error', (e) => {
+        console.error('Server error:', e);
+    });
+}
